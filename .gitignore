@@ -1,0 +1,98 @@
+# Sensitive information - NEVER commit these files
+*.key
+*.pem
+*.pfx
+*.p12
+*.cer
+*.crt
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.credentials
+.aws/
+.azure/
+.ssh/
+.gnupg/
+.kube/
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+ehthumbs_vista.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Editor files
+*.swp
+*.swo
+*.swn
+*~
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+*.tmp
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Local overrides (for personal customizations not to be shared)
+*.local
+*.local.*
+local/
+private/
+
+# Shell history (if accidentally placed in repo)
+.bash_history
+.zsh_history
+.powershell_history
+.history
+
+# Node modules (if any scripts use node)
+node_modules/
+
+# Python (if any scripts use python)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Windows specific
+[Dd]esktop.ini
+ehthumbs_vista.db
+
+# macOS specific
+.AppleDouble
+.LSOverride
+Icon
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
