@@ -283,7 +283,8 @@ git submodule update --remote</code></pre>
         <p>For detailed documentation, customization options, and troubleshooting tips, see the <a href="https://github.com/romaklimenko/dotfiles/blob/main/README.md">full README on GitHub</a>.</p>
 
         <footer>
-            <p>&copy; 2025 Roman Klimenko | <a href="https://github.com/romaklimenko">@romaklimenko</a></p>
+            <p>&copy; <span id="year"></span> Roman Klimenko | <a href="https://github.com/romaklimenko">@romaklimenko</a></p>
+            <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
             <p style="margin-top: 10px; font-size: 0.9em;">
                 These dotfiles are available under the MIT License
             </p>
