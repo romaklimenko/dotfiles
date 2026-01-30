@@ -42,6 +42,21 @@ function gco { git checkout $args }
 function gb { git branch $args }
 function gpl { git pull $args }
 
+# Databricks shortcuts
+function d { databricks $args }
+function db { databricks bundle $args }
+function dbd { databricks bundle deploy $args }
+function dbv { databricks bundle validate $args }
+function dbr { databricks bundle run $args }
+function dbs { databricks bundle sync $args }
+function dw { databricks workspace $args }
+function dj { databricks jobs $args }
+function dc { databricks clusters $args }
+function dfs { databricks fs $args }
+
+# Profile management
+function pp { . $PROFILE }
+
 # WSL integration
 function ubuntu { wsl -d Ubuntu $args }
 function wslh { wsl ~ }
