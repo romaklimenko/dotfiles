@@ -26,6 +26,7 @@ if (Get-Command nvim -ErrorAction SilentlyContinue) {
 
 # Navigation shortcuts
 function cdh { Set-Location $env:HOME }
+function hh { if ($env:HOME) { Set-Location $env:HOME } }
 function dots { Set-Location "$env:HOME\dotfiles" }
 function .. { Set-Location .. }
 function ... { Set-Location ..\.. }
