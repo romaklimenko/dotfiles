@@ -218,19 +218,46 @@ The Windows PowerShell profile includes:
 
 - **Custom HOME:** `$env:HOME` set to `C:\home`
 - **Aliases:**
-  - `ll` - List files (detailed)
-  - `la` - List all files
-  - `vim` - Opens Neovim
-  - Navigation shortcuts
+  - `ll`, `la` - List files
+  - `vim`, `vi` - Opens Neovim (if installed)
+- **Navigation Shortcuts:**
+  - `cdh` - Go to HOME directory
+  - `hh` - Go to HOME directory (if set)
+  - `dots` - Go to dotfiles directory
+  - `..`, `...`, `....` - Go up 1, 2, or 3 directories
 - **Git Shortcuts:**
   - `gs` - git status
   - `ga` - git add
   - `gc` - git commit
   - `gp` - git push
-- **Functions:**
-  - `cdh` - Go to HOME directory
-  - `dots` - Go to dotfiles directory
-  - `ubuntu` - Launch WSL
+  - `gl` - git log (oneline, graph, decorate)
+  - `gd` - git diff
+  - `gco` - git checkout
+  - `gb` - git branch
+  - `gpl` - git pull
+- **Databricks Shortcuts:**
+  - `d` - databricks
+  - `db` - databricks bundle
+  - `dbd` - databricks bundle deploy
+  - `dbv` - databricks bundle validate
+  - `dbr` - databricks bundle run
+  - `dbs` - databricks bundle sync
+  - `dw` - databricks workspace
+  - `dj` - databricks jobs
+  - `dc` - databricks clusters
+  - `dfs` - databricks fs
+- **WSL Integration:**
+  - `ubuntu` - Launch WSL Ubuntu
+  - `wslh` - Open WSL in home directory
+- **Utility Functions:**
+  - `pp` - Reload PowerShell profile
+  - `which` - Find command location
+  - `touch` - Create or update file timestamp
+  - `grep` - Search text with patterns
+  - `lsa` - List all files (including hidden)
+  - `du` - Show directory size
+  - `mkcd` - Create directory and cd into it
+  - `explore` - Open directory in Windows Explorer
 
 ## Bash/Zsh Features
 
