@@ -219,9 +219,11 @@ chmod +x install.sh
                 <h4>PowerShell Profile</h4>
                 <ul>
                     <li>Custom <code>$env:HOME</code></li>
-                    <li>Useful aliases & functions</li>
+                    <li>Navigation shortcuts</li>
                     <li>Git shortcuts</li>
+                    <li>Databricks CLI shortcuts</li>
                     <li>WSL integration</li>
+                    <li>Utility functions</li>
                 </ul>
             </div>
 
@@ -255,6 +257,67 @@ chmod +x install.sh
                 </ul>
             </div>
         </div>
+
+        <h2>PowerShell Profile Reference</h2>
+
+        <h3>Aliases</h3>
+        <ul>
+            <li><code>ll</code>, <code>la</code> - List files</li>
+            <li><code>vim</code>, <code>vi</code> - Opens Neovim (if installed)</li>
+        </ul>
+
+        <h3>Navigation Shortcuts</h3>
+        <ul>
+            <li><code>cdh</code> - Go to HOME directory</li>
+            <li><code>hh</code> - Go to HOME directory (if set)</li>
+            <li><code>dots</code> - Go to dotfiles directory</li>
+            <li><code>..</code>, <code>...</code>, <code>....</code> - Go up 1, 2, or 3 directories</li>
+        </ul>
+
+        <h3>Git Shortcuts</h3>
+        <ul>
+            <li><code>gs</code> - git status</li>
+            <li><code>ga</code> - git add</li>
+            <li><code>gc</code> - git commit</li>
+            <li><code>gp</code> - git push</li>
+            <li><code>gl</code> - git log (oneline, graph, decorate)</li>
+            <li><code>gd</code> - git diff</li>
+            <li><code>gco</code> - git checkout</li>
+            <li><code>gb</code> - git branch</li>
+            <li><code>gpl</code> - git pull</li>
+        </ul>
+
+        <h3>Databricks Shortcuts</h3>
+        <ul>
+            <li><code>d</code> - databricks</li>
+            <li><code>db</code> - databricks bundle</li>
+            <li><code>dbd</code> - databricks bundle deploy</li>
+            <li><code>dbv</code> - databricks bundle validate</li>
+            <li><code>dbr</code> - databricks bundle run</li>
+            <li><code>dbs</code> - databricks bundle sync</li>
+            <li><code>dw</code> - databricks workspace</li>
+            <li><code>dj</code> - databricks jobs</li>
+            <li><code>dc</code> - databricks clusters</li>
+            <li><code>dfs</code> - databricks fs</li>
+        </ul>
+
+        <h3>WSL Integration</h3>
+        <ul>
+            <li><code>ubuntu</code> - Launch WSL Ubuntu</li>
+            <li><code>wslh</code> - Open WSL in home directory</li>
+        </ul>
+
+        <h3>Utility Functions</h3>
+        <ul>
+            <li><code>pp</code> - Reload PowerShell profile</li>
+            <li><code>which</code> - Find command location</li>
+            <li><code>touch</code> - Create or update file timestamp</li>
+            <li><code>grep</code> - Search text with patterns</li>
+            <li><code>lsa</code> - List all files (including hidden)</li>
+            <li><code>du</code> - Show directory size</li>
+            <li><code>mkcd</code> - Create directory and cd into it</li>
+            <li><code>explore</code> - Open directory in Windows Explorer</li>
+        </ul>
 
         <h2>Manual Installation</h2>
 
