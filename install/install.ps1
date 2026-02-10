@@ -25,7 +25,7 @@ Write-Host ""
 # Step 1: Create C:\home if it doesn't exist
 # -----------------------------------------------------------------------------
 
-Write-Info "[1/7] Checking C:\home directory..."
+Write-Info "[1/8] Checking C:\home directory..."
 if (-not (Test-Path "C:\home")) {
     Write-Warning "Creating C:\home directory..."
     try {
@@ -46,7 +46,7 @@ Write-Host ""
 # -----------------------------------------------------------------------------
 
 $dotfilesPath = "C:\home\dotfiles"
-Write-Info "[2/7] Setting up dotfiles repository..."
+Write-Info "[2/8] Setting up dotfiles repository..."
 
 if (-not (Test-Path $dotfilesPath)) {
     Write-Info "Cloning dotfiles repository..."
@@ -78,7 +78,7 @@ Write-Host ""
 # Step 3: Initialize Neovim submodule
 # -----------------------------------------------------------------------------
 
-Write-Info "[3/7] Setting up Neovim configuration..."
+Write-Info "[3/8] Setting up Neovim configuration..."
 try {
     git submodule init
     git submodule update --remote
@@ -93,7 +93,7 @@ Write-Host ""
 # Step 4: Backup and install PowerShell profile
 # -----------------------------------------------------------------------------
 
-Write-Info "[4/7] Installing PowerShell profile..."
+Write-Info "[4/8] Installing PowerShell profile..."
 $profilePath = $PROFILE
 
 # Create profile directory if it doesn't exist
@@ -127,7 +127,7 @@ Write-Host ""
 # Step 5: Install Neovim configuration
 # -----------------------------------------------------------------------------
 
-Write-Info "[5/7] Installing Neovim configuration..."
+Write-Info "[5/8] Installing Neovim configuration..."
 $nvimConfigPath = "$env:LOCALAPPDATA\nvim"
 
 # Backup existing Neovim config
@@ -159,7 +159,93 @@ Write-Host ""
 # Step 6: Verify installation
 # -----------------------------------------------------------------------------
 
-Write-Info "[6/7] Verifying installation..."
+Write-Info "[6/8] Installing Claude Code configuration..."
+$claudeConfigPath = "$env:USERPROFILE\.claude"
+
+# Create .claude directory if it doesn't exist
+if (-not (Test-Path $claudeConfigPath)) {
+    Write-Info "Creating .claude directory..."
+    New-Item -ItemType Directory -Path $claudeConfigPath -Force | Out-Null
+}
+
+# Install settings.json
+$claudeSettingsSource = "$dotfilesPath\claude\settings.json"
+$claudeSettingsTarget = "$claudeConfigPath\settings.json"
+if (Test-Path $claudeSettingsTarget) {
+    if (-not $SkipBackup) {
+        $backupPath = "$claudeSettingsTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Warning "Backing up existing Claude Code settings to:"
+        Write-Warning "  $backupPath"
+        Copy-Item $claudeSettingsTarget $backupPath
+    }
+}
+try {
+    Copy-Item $claudeSettingsSource $claudeSettingsTarget -Force
+    Write-Success "Claude Code settings installed to:"
+    Write-Success "  $claudeSettingsTarget"
+} catch {
+    Write-Warning "Failed to install Claude Code settings: $_"
+}
+
+# Install CLAUDE.md
+$claudeMdSource = "$dotfilesPath\claude\CLAUDE.md"
+$claudeMdTarget = "$claudeConfigPath\CLAUDE.md"
+if (Test-Path $claudeMdTarget) {
+    if (-not $SkipBackup) {
+        $backupPath = "$claudeMdTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Warning "Backing up existing global CLAUDE.md to:"
+        Write-Warning "  $backupPath"
+        Copy-Item $claudeMdTarget $backupPath
+    }
+}
+try {
+    Copy-Item $claudeMdSource $claudeMdTarget -Force
+    Write-Success "Global CLAUDE.md installed to:"
+    Write-Success "  $claudeMdTarget"
+} catch {
+    Write-Warning "Failed to install global CLAUDE.md: $_"
+}
+
+# Install commands directory
+$claudeCommandsSource = "$dotfilesPath\claude\commands"
+$claudeCommandsTarget = "$claudeConfigPath\commands"
+if ((Test-Path $claudeCommandsTarget) -and -not (Get-Item $claudeCommandsTarget).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
+    if (-not $SkipBackup) {
+        $backupPath = "$claudeCommandsTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Warning "Backing up existing Claude Code commands to:"
+        Write-Warning "  $backupPath"
+        Move-Item $claudeCommandsTarget $backupPath
+    } else {
+        Remove-Item $claudeCommandsTarget -Recurse -Force
+    }
+}
+try {
+    if (Test-Path $claudeCommandsTarget) {
+        Remove-Item $claudeCommandsTarget -Force
+    }
+    New-Item -ItemType SymbolicLink -Path $claudeCommandsTarget -Target $claudeCommandsSource -Force | Out-Null
+    Write-Success "Claude Code commands symlinked to:"
+    Write-Success "  $claudeCommandsTarget"
+} catch {
+    Write-Warning "Failed to create symlink for Claude Code commands: $_"
+    Write-Warning "Falling back to copy..."
+    try {
+        Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
+        Write-Success "Claude Code commands copied to:"
+        Write-Success "  $claudeCommandsTarget"
+    } catch {
+        Write-Warning "Failed to copy Claude Code commands: $_"
+    }
+}
+
+Write-Success "Claude Code configuration installed"
+Write-Host ""
+
+# -----------------------------------------------------------------------------
+# Step 7: Verify installation
+# -----------------------------------------------------------------------------
+
+Write-Info "[7/8] Verifying installation..."
 $issues = @()
 
 if (-not (Test-Path $profilePath)) {
@@ -168,6 +254,14 @@ if (-not (Test-Path $profilePath)) {
 
 if (-not (Test-Path "$dotfilesPath\nvim")) {
     $issues += "Neovim configuration not found at $dotfilesPath\nvim"
+}
+
+if (-not (Test-Path "$claudeConfigPath\settings.json")) {
+    $issues += "Claude Code settings not found at $claudeConfigPath\settings.json"
+}
+
+if (-not (Test-Path "$claudeConfigPath\commands")) {
+    $issues += "Claude Code commands not found at $claudeConfigPath\commands"
 }
 
 if ($issues.Count -eq 0) {
@@ -181,10 +275,10 @@ if ($issues.Count -eq 0) {
 Write-Host ""
 
 # -----------------------------------------------------------------------------
-# Step 7: Next steps
+# Step 8: Next steps
 # -----------------------------------------------------------------------------
 
-Write-Info "[7/7] Installation complete!"
+Write-Info "[8/8] Installation complete!"
 Write-Host ""
 Write-Success "============================================================================"
 Write-Success "Dotfiles installed successfully!"

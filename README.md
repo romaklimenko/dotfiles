@@ -20,6 +20,11 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Integrated as git submodule
   - Shared across Windows and Linux
 
+- **Claude Code Configuration:** Shared [Claude Code](https://claude.ai/claude-code) settings across machines
+  - Global `CLAUDE.md` instructions
+  - Global settings (`settings.json`)
+  - Custom slash commands
+
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
 
 ## Quick Start
@@ -64,7 +69,14 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Reload profile:
+5. Install Claude Code configuration:
+```powershell
+Copy-Item .\claude\settings.json "$env:USERPROFILE\.claude\settings.json" -Force
+Copy-Item .\claude\CLAUDE.md "$env:USERPROFILE\.claude\CLAUDE.md" -Force
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "C:\home\dotfiles\claude\commands" -Force
+```
+
+6. Reload profile:
 ```powershell
 . $PROFILE
 ```
@@ -93,7 +105,15 @@ mkdir -p ~/.config
 ln -sf ~/dotfiles/nvim ~/.config/nvim
 ```
 
-4. Reload shell:
+4. Install Claude Code configuration:
+```bash
+mkdir -p ~/.claude
+cp ~/dotfiles/claude/settings.json ~/.claude/settings.json
+cp ~/dotfiles/claude/CLAUDE.md ~/.claude/CLAUDE.md
+ln -sf ~/dotfiles/claude/commands ~/.claude/commands
+```
+
+5. Reload shell:
 ```bash
 source ~/.bashrc
 ```
@@ -105,13 +125,17 @@ dotfiles/
 ├── .github/          # GitHub Actions workflows
 │   └── workflows/
 │       └── pages.yml # GitHub Pages deployment
+├── claude/           # Claude Code configuration
+│   ├── CLAUDE.md     # Global instructions for all projects
+│   ├── settings.json # Global settings
+│   └── commands/     # Custom slash commands
 ├── install/          # Installation scripts and GitHub Pages
 │   ├── install.ps1   # Windows installer
-│   ├── install.sh    # Linux installer
+│   ├── install.sh    # Linux/macOS installer
 │   └── index.html    # Landing page
 ├── windows/          # Windows-specific configurations
 │   └── Microsoft.PowerShell_profile.ps1
-├── linux/            # Linux/WSL configurations
+├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
 │   ├── .bash_aliases
 │   ├── .zshrc
@@ -173,6 +197,7 @@ Create `~/.bashrc.local` (gitignored) and source it from `.bashrc`.
 ## Supported Environments
 
 - **Windows:** Windows 10/11 with PowerShell 5.1+
+- **macOS:** macOS with Bash/Zsh (uses linux/ configs)
 - **Linux:** Ubuntu 20.04+ (WSL2 or standalone)
 - **Shell:** Bash 4.0+, Zsh 5.0+
 
@@ -258,6 +283,27 @@ The Windows PowerShell profile includes:
   - `du` - Show directory size
   - `mkcd` - Create directory and cd into it
   - `explore` - Open directory in Windows Explorer
+
+## Claude Code Configuration
+
+The Claude Code configuration is shared across all platforms:
+
+- **Global CLAUDE.md:** Instructions that apply to all projects, copied to `~/.claude/CLAUDE.md`
+- **Settings:** Global `settings.json` copied to `~/.claude/settings.json`
+- **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
+  - `/suggest-commit-message` - Analyzes staged changes and suggests a commit message
+
+### Configuration Paths
+
+| Platform | Config directory |
+|----------|-----------------|
+| Windows  | `%USERPROFILE%\.claude\` |
+| macOS    | `~/.claude/` |
+| Linux    | `~/.claude/` |
+
+### Adding Custom Commands
+
+Create `.md` files in `claude/commands/` to add new slash commands. See the [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code) for the command format.
 
 ## Bash/Zsh Features
 

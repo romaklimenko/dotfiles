@@ -27,7 +27,7 @@ echo ""
 # Step 1: Detect environment
 # -----------------------------------------------------------------------------
 
-print_info "[1/8] Detecting environment..."
+print_info "[1/9] Detecting environment..."
 IS_WSL=false
 if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null; then
     print_success "WSL detected"
@@ -44,7 +44,7 @@ echo ""
 DOTFILES_DIR="$HOME/dotfiles"
 DOTFILES_REPO="https://github.com/romaklimenko/dotfiles.git"
 
-print_info "[2/8] Setting up dotfiles repository..."
+print_info "[2/9] Setting up dotfiles repository..."
 if [ ! -d "$DOTFILES_DIR" ]; then
     print_info "Cloning dotfiles repository..."
     if git clone "$DOTFILES_REPO" "$DOTFILES_DIR"; then
@@ -72,7 +72,7 @@ echo ""
 # Step 3: Initialize Neovim submodule
 # -----------------------------------------------------------------------------
 
-print_info "[3/8] Setting up Neovim configuration..."
+print_info "[3/9] Setting up Neovim configuration..."
 if git submodule init && git submodule update --remote; then
     print_success "Neovim configuration ready"
 else
@@ -113,7 +113,7 @@ link_file() {
 # Step 4: Link shell configuration files
 # -----------------------------------------------------------------------------
 
-print_info "[4/8] Installing shell configuration files..."
+print_info "[4/9] Installing shell configuration files..."
 
 link_file "$DOTFILES_DIR/linux/.bashrc" "$HOME/.bashrc"
 link_file "$DOTFILES_DIR/linux/.bash_aliases" "$HOME/.bash_aliases"
@@ -127,7 +127,7 @@ echo ""
 # Step 5: Link Neovim configuration
 # -----------------------------------------------------------------------------
 
-print_info "[5/8] Installing Neovim configuration..."
+print_info "[5/9] Installing Neovim configuration..."
 
 # Create .config directory if it doesn't exist
 mkdir -p "$HOME/.config"
@@ -154,7 +154,50 @@ echo ""
 # Step 6: Set file permissions
 # -----------------------------------------------------------------------------
 
-print_info "[6/8] Setting file permissions..."
+print_info "[6/9] Installing Claude Code configuration..."
+CLAUDE_CONFIG_DIR="$HOME/.claude"
+
+# Create .claude directory if it doesn't exist
+mkdir -p "$CLAUDE_CONFIG_DIR"
+
+# Install settings.json
+CLAUDE_SETTINGS_SOURCE="$DOTFILES_DIR/claude/settings.json"
+CLAUDE_SETTINGS_TARGET="$CLAUDE_CONFIG_DIR/settings.json"
+if [ -f "$CLAUDE_SETTINGS_TARGET" ]; then
+    backup_file "$CLAUDE_SETTINGS_TARGET"
+fi
+cp "$CLAUDE_SETTINGS_SOURCE" "$CLAUDE_SETTINGS_TARGET"
+print_success "Claude Code settings installed to:"
+print_success "  $CLAUDE_SETTINGS_TARGET"
+
+# Install CLAUDE.md
+CLAUDE_MD_SOURCE="$DOTFILES_DIR/claude/CLAUDE.md"
+CLAUDE_MD_TARGET="$CLAUDE_CONFIG_DIR/CLAUDE.md"
+if [ -f "$CLAUDE_MD_TARGET" ]; then
+    backup_file "$CLAUDE_MD_TARGET"
+fi
+cp "$CLAUDE_MD_SOURCE" "$CLAUDE_MD_TARGET"
+print_success "Global CLAUDE.md installed to:"
+print_success "  $CLAUDE_MD_TARGET"
+
+# Install commands directory (symlink)
+CLAUDE_COMMANDS_SOURCE="$DOTFILES_DIR/claude/commands"
+CLAUDE_COMMANDS_TARGET="$CLAUDE_CONFIG_DIR/commands"
+if [ -d "$CLAUDE_COMMANDS_TARGET" ] && [ ! -L "$CLAUDE_COMMANDS_TARGET" ]; then
+    backup_file "$CLAUDE_COMMANDS_TARGET"
+fi
+ln -sf "$CLAUDE_COMMANDS_SOURCE" "$CLAUDE_COMMANDS_TARGET"
+print_success "Claude Code commands symlinked to:"
+print_success "  $CLAUDE_COMMANDS_TARGET"
+
+print_success "Claude Code configuration installed"
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 7: Set file permissions
+# -----------------------------------------------------------------------------
+
+print_info "[7/9] Setting file permissions..."
 
 chmod 644 "$HOME/.bashrc" 2>/dev/null || true
 chmod 644 "$HOME/.bash_aliases" 2>/dev/null || true
@@ -165,10 +208,10 @@ print_success "File permissions set"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 7: Verify installation
+# Step 8: Verify installation
 # -----------------------------------------------------------------------------
 
-print_info "[7/8] Verifying installation..."
+print_info "[8/9] Verifying installation..."
 ISSUES=()
 
 [ ! -f "$HOME/.bashrc" ] && ISSUES+=("~/.bashrc not found")
@@ -176,6 +219,8 @@ ISSUES=()
 [ ! -f "$HOME/.zshrc" ] && ISSUES+=("~/.zshrc not found")
 [ ! -f "$HOME/.profile" ] && ISSUES+=("~/.profile not found")
 [ ! -d "$NVIM_CONFIG" ] && ISSUES+=("Neovim config not found at $NVIM_CONFIG")
+[ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
+[ ! -d "$CLAUDE_CONFIG_DIR/commands" ] && ISSUES+=("Claude Code commands not found at $CLAUDE_CONFIG_DIR/commands")
 
 if [ ${#ISSUES[@]} -eq 0 ]; then
     print_success "All checks passed!"
@@ -188,10 +233,10 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 8: Next steps
+# Step 9: Next steps
 # -----------------------------------------------------------------------------
 
-print_info "[8/8] Installation complete!"
+print_info "[9/9] Installation complete!"
 echo ""
 print_success "============================================================================"
 print_success "Dotfiles installed successfully!"
