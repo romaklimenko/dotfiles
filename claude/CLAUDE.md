@@ -19,6 +19,10 @@ These instructions apply to all projects unless overridden by a project-level CL
 - Use imperative mood in commit messages ("Add feature" not "Added feature")
 - Keep commit messages under 50 characters for the summary line
 
+## Documentation
+
+- If the project has a README.md, update it to reflect any changes you make
+
 ## Security
 
 - Never commit secrets, API keys, tokens, or passwords

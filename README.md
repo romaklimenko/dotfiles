@@ -328,6 +328,8 @@ The Windows PowerShell profile includes:
   - `lsa` - List all files (including hidden)
   - `du` - Show directory size
   - `mkcd` - Create directory and cd into it
+  - `myip` - Show external IPv4 address
+  - `myip6` - Show external IPv6 address
   - `explore` - Open directory in Windows Explorer
 <!-- sync:powershell-reference:end -->
 
@@ -337,6 +339,7 @@ The Claude Code configuration is shared across all platforms:
 
 - **Global CLAUDE.md:** Instructions that apply to all projects, copied to `~/.claude/CLAUDE.md`
 - **Settings:** Global `settings.json` copied to `~/.claude/settings.json`
+  - `denyRead` rules to prevent reading `.env` files
 - **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
   - `/suggest-commit-message` - Analyzes staged changes and suggests a commit message
 
@@ -361,6 +364,7 @@ The Linux shell configuration includes:
 - **Editor:** Neovim set as default (`$EDITOR` and `$VISUAL`)
 - **WSL Detection:** Automatically detects and configures WSL-specific settings
 - **Git Integration:** Useful git aliases and shortcuts
+- **Network Utilities:** `myip`, `myip6`, `localip`, `ports`, `ping`
 
 ## License
 

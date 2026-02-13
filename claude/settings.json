@@ -5,6 +5,10 @@
     "pr": ""
   },
   "enabledPlugins": {},
+  "denyRead": [
+    "**/.env",
+    "**/.env.*"
+  ],
   "respectGitignore": true,
   "spinnerVerbs": {
     "mode": "append",
