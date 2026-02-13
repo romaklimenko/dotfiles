@@ -130,6 +130,9 @@ function mkcd {
     Set-Location $Path
 }
 
+# Show external IP address
+function myip { (Invoke-RestMethod -Uri 'https://ifconfig.me/ip').Trim() }
+
 # Open current directory in Windows Explorer
 function explore {
     param([string]$Path = ".")
