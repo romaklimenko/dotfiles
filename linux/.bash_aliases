@@ -217,6 +217,7 @@ alias activate='source venv/bin/activate'
 
 # Show external IP
 alias myip='curl -s ifconfig.me'
+alias myip6='curl -s ipv6.ifconfig.me'
 
 # Show local IPs
 alias localip='hostname -I'

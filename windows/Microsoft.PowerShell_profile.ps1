@@ -131,7 +131,8 @@ function mkcd {
 }
 
 # Show external IP address
-function myip { (Invoke-RestMethod -Uri 'https://ifconfig.me/ip').Trim() }
+function myip { (Invoke-RestMethod -Uri 'https://ifconfig.me/ip' -UserAgent 'curl').Trim() }
+function myip6 { (Invoke-RestMethod -Uri 'https://ipv6.ifconfig.me' -UserAgent 'curl').Trim() }
 
 # Open current directory in Windows Explorer
 function explore {
