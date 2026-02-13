@@ -4,6 +4,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
 
 ## Features
 
+<!-- sync:features:start -->
 - **PowerShell Profile:** Custom Windows PowerShell configuration with:
   - `$env:HOME` set to `C:\home`
   - Useful aliases and functions
@@ -26,9 +27,11 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Custom slash commands
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
+<!-- sync:features:end -->
 
 ## Quick Start
 
+<!-- sync:quick-start:start -->
 ### Windows (PowerShell)
 
 ```powershell
@@ -42,6 +45,7 @@ curl -fsSL dotfiles.klimenko.dk/install.sh | bash
 ```
 
 **Security Note:** Always review scripts before running them. View the source at [github.com/romaklimenko/dotfiles](https://github.com/romaklimenko/dotfiles).
+<!-- sync:quick-start:end -->
 
 ## Manual Installation
 
@@ -142,6 +146,34 @@ dotfiles/
 │   └── .profile
 ├── nvim/             # Neovim config (git submodule)
 └── .gitignore        # Security patterns
+```
+
+## Docs Sync
+
+`README.md` is the source of truth for shared install documentation.
+`install/index.html` is partially generated from marker blocks in this README.
+
+### Sync Commands
+
+```bash
+npm run sync:docs       # Generate install/index.html from README.md
+npm run sync:docs:check # Verify generated content is up to date
+```
+
+### Marker Blocks
+
+The generator currently syncs these marker ranges in `README.md`:
+
+- `<!-- sync:quick-start:start --> ... <!-- sync:quick-start:end -->`
+- `<!-- sync:features:start --> ... <!-- sync:features:end -->`
+- `<!-- sync:powershell-reference:start --> ... <!-- sync:powershell-reference:end -->`
+
+### Git Hook Setup (Recommended)
+
+Set repository hooks path once to auto-sync before each commit:
+
+```bash
+git config core.hooksPath .githooks
 ```
 
 ## Updating
@@ -250,6 +282,7 @@ chmod 644 ~/.bashrc ~/.bash_aliases ~/.zshrc ~/.profile
 
 The Windows PowerShell profile includes:
 
+<!-- sync:powershell-reference:start -->
 - **Custom HOME:** `$env:HOME` set to `C:\home`
 - **Aliases:**
   - `ll`, `la` - List files
@@ -295,6 +328,7 @@ The Windows PowerShell profile includes:
   - `du` - Show directory size
   - `mkcd` - Create directory and cd into it
   - `explore` - Open directory in Windows Explorer
+<!-- sync:powershell-reference:end -->
 
 ## Claude Code Configuration
 

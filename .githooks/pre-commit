@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+echo "Syncing README.md -> install/index.html"
+npm run sync:docs
+git add install/index.html

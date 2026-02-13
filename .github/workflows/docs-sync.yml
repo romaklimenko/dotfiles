@@ -1,0 +1,25 @@
+name: Docs Sync Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify documentation sync
+        run: npm run sync:docs:check
