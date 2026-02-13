@@ -146,7 +146,16 @@ dotfiles/
 
 ## Updating
 
-### Update Dotfiles
+### Update Dotfiles (PowerShell)
+
+Use the built-in profile commands:
+
+```powershell
+dotpull   # Pull from remote and apply (profile + Claude Code config)
+dotsync   # Apply from local repo without pulling (for testing changes)
+```
+
+Or manually:
 
 ```bash
 # In dotfiles directory
@@ -274,6 +283,9 @@ The Windows PowerShell profile includes:
 - **WSL Integration:**
   - `ubuntu` - Launch WSL Ubuntu
   - `wslh` - Open WSL in home directory
+- **Dotfiles Management:**
+  - `dotsync` - Apply dotfiles from local repo to system (for testing without committing)
+  - `dotpull` - Pull latest from remote repo and apply
 - **Utility Functions:**
   - `pp` - Reload PowerShell profile
   - `which` - Find command location

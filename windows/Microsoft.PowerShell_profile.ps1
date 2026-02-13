@@ -58,6 +58,25 @@ function dfs { databricks fs $args }
 # Profile management
 function pp { . $PROFILE }
 
+# Apply dotfiles from local repo to system (for testing without committing)
+function dotsync {
+    $dotfilesPath = "$env:HOME\dotfiles"
+    Copy-Item "$dotfilesPath\windows\Microsoft.PowerShell_profile.ps1" $PROFILE -Force
+    $claudeConfigPath = "$env:USERPROFILE\.claude"
+    Copy-Item "$dotfilesPath\claude\settings.json" "$claudeConfigPath\settings.json" -Force
+    Copy-Item "$dotfilesPath\claude\CLAUDE.md" "$claudeConfigPath\CLAUDE.md" -Force
+    Write-Host "Dotfiles applied from local repo" -ForegroundColor Green
+    . $PROFILE
+}
+
+# Pull latest dotfiles from remote and apply
+function dotpull {
+    Push-Location "$env:HOME\dotfiles"
+    git pull
+    Pop-Location
+    dotsync
+}
+
 # WSL integration
 function ubuntu { wsl -d Ubuntu $args }
 function wslh { wsl ~ }
