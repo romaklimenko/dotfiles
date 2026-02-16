@@ -304,6 +304,7 @@ The Windows PowerShell profile includes:
   - `gb` - git branch
   - `gpl` - git pull
 - **Databricks Shortcuts:**
+  - `dbcfg` - Open `.databrickscfg` in editor
   - `d` - databricks
   - `db` - databricks bundle
   - `dbd` - databricks bundle deploy

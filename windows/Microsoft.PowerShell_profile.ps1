@@ -44,6 +44,7 @@ function gb { git branch $args }
 function gpl { git pull $args }
 
 # Databricks shortcuts
+function dbcfg { code "$env:USERPROFILE\.databrickscfg" }
 function d { databricks $args }
 function db { databricks bundle $args }
 function dbd { databricks bundle deploy $args }

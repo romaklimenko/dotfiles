@@ -167,6 +167,7 @@ alias reload='source ~/.bashrc'
 # Edit configuration files
 alias bashrc='$EDITOR ~/dotfiles/linux/.bashrc'
 alias aliases='$EDITOR ~/dotfiles/linux/.bash_aliases'
+alias dbcfg='$EDITOR ~/.databrickscfg'
 
 # -----------------------------------------------------------------------------
 # Apt Shortcuts (Ubuntu/Debian)
