@@ -36,12 +36,12 @@ function .... { Set-Location ..\..\.. }
 function gs { git status $args }
 function ga { git add $args }
 function gc { git commit -m $args }
-function gp { git push $args }
+function gpsh { git push $args }
 function gl { git log --oneline --graph --decorate $args }
 function gd { git diff $args }
 function gco { git checkout $args }
 function gb { git branch $args }
-function gpl { git pull $args }
+function gpll { git pull $args }
 
 # Databricks shortcuts
 function dbcfg { code "$env:USERPROFILE\.databrickscfg" }

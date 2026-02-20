@@ -297,12 +297,12 @@ The Windows PowerShell profile includes:
   - `gs` - git status
   - `ga` - git add
   - `gc` - git commit
-  - `gp` - git push
+  - `gpsh` - git push
   - `gl` - git log (oneline, graph, decorate)
   - `gd` - git diff
   - `gco` - git checkout
   - `gb` - git branch
-  - `gpl` - git pull
+  - `gpll` - git pull
 - **Databricks Shortcuts:**
   - `dbcfg` - Open `.databrickscfg` in editor
   - `d` - databricks
