@@ -342,7 +342,8 @@ The Claude Code configuration is shared across all platforms:
 - **Settings:** Global `settings.json` copied to `~/.claude/settings.json`
   - `denyRead` rules to prevent reading `.env` files
 - **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
-  - `/suggest-commit-message` - Analyzes staged changes and suggests a commit message
+  - `/commit-message` - Analyzes staged changes and suggests a commit message
+  - `/pr` - Generates a PR title and description in markdown vs main/master
 
 ### Configuration Paths
 

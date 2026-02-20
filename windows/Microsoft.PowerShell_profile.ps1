@@ -42,6 +42,12 @@ function gd { git diff $args }
 function gco { git checkout $args }
 function gb { git branch $args }
 function gpll { git pull $args }
+function gf { git fetch $args }
+function gds { git diff --staged $args }
+function gba { git branch -a $args }
+function gm { git merge $args }
+function gr { git remote -v $args }
+function glog { git log --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --abbrev-commit $args }
 
 # Databricks shortcuts
 function dbcfg { code "$env:USERPROFILE\.databrickscfg" }
@@ -66,6 +72,16 @@ function dotsync {
     $claudeConfigPath = "$env:USERPROFILE\.claude"
     Copy-Item "$dotfilesPath\claude\settings.json" "$claudeConfigPath\settings.json" -Force
     Copy-Item "$dotfilesPath\claude\CLAUDE.md" "$claudeConfigPath\CLAUDE.md" -Force
+    $claudeCommandsSource = "$dotfilesPath\claude\commands"
+    $claudeCommandsTarget = "$claudeConfigPath\commands"
+    if (Test-Path $claudeCommandsTarget) {
+        Remove-Item $claudeCommandsTarget -Recurse -Force
+    }
+    try {
+        New-Item -ItemType SymbolicLink -Path $claudeCommandsTarget -Target $claudeCommandsSource -Force -ErrorAction Stop | Out-Null
+    } catch {
+        Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
+    }
     Write-Host "Dotfiles applied from local repo" -ForegroundColor Green
     . $PROFILE
 }
