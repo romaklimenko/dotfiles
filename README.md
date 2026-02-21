@@ -344,6 +344,8 @@ The Claude Code configuration is shared across all platforms:
 - **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
   - `/commit-message` - Analyzes staged changes and suggests a commit message
   - `/pr` - Generates a PR title and description in markdown vs main/master
+  - `/remember` - Saves a project-level preference to CLAUDE.md for future sessions
+  - `/remember-always` - Saves a global preference to ~/.claude/CLAUDE.md for all projects
 
 ### Configuration Paths
 
