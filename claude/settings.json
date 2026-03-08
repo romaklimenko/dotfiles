@@ -5,10 +5,14 @@
     "pr": ""
   },
   "enabledPlugins": {},
-  "denyRead": [
-    "**/.env",
-    "**/.env.*"
-  ],
+  "permissions": {
+    "deny": [
+      "Read(*.env)",
+      "Bash(rm:*)",
+      "Bash(curl:*)"
+    ],
+    "defaultMode": "default"
+  },
   "respectGitignore": true,
   "spinnerVerbs": {
     "mode": "append",
