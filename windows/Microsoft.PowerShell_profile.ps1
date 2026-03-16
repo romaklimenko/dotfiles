@@ -172,22 +172,37 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 }
 
 # -----------------------------------------------------------------------------
-# Custom Prompt (Optional - uncomment to use)
+# Custom Prompt
 # -----------------------------------------------------------------------------
 
-# function prompt {
-#     $location = Get-Location
-#     $gitBranch = git rev-parse --abbrev-ref HEAD 2>$null
-#
-#     Write-Host "PS " -NoNewline -ForegroundColor Green
-#     Write-Host "$location" -NoNewline -ForegroundColor Cyan
-#
-#     if ($gitBranch) {
-#         Write-Host " [$gitBranch]" -NoNewline -ForegroundColor Yellow
-#     }
-#
-#     return "> "
-# }
+function prompt {
+    $lastCmd = Get-History -Count 1
+    $location = Get-Location
+    $gitBranch = git rev-parse --abbrev-ref HEAD 2>$null
+
+    Write-Host "PS " -NoNewline -ForegroundColor Green
+    Write-Host "$location" -NoNewline -ForegroundColor Cyan
+
+    if ($gitBranch) {
+        Write-Host " [$gitBranch]" -NoNewline -ForegroundColor Yellow
+    }
+
+    if ($lastCmd) {
+        $duration = $lastCmd.Duration
+        if ($duration.TotalHours -ge 1) {
+            $timeStr = "{0:0}h {1:0}m {2:0}s" -f $duration.Hours, $duration.Minutes, $duration.Seconds
+        } elseif ($duration.TotalMinutes -ge 1) {
+            $timeStr = "{0:0}m {1:0}s" -f $duration.Minutes, $duration.Seconds
+        } elseif ($duration.TotalSeconds -ge 1) {
+            $timeStr = "{0:0.000}s" -f $duration.TotalSeconds
+        } else {
+            $timeStr = "{0:0}ms" -f $duration.TotalMilliseconds
+        }
+        Write-Host " ($timeStr)" -NoNewline -ForegroundColor DarkGray
+    }
+
+    return "> "
+}
 
 # -----------------------------------------------------------------------------
 # Welcome Message (Optional - uncomment to use)
