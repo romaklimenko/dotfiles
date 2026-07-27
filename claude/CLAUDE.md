@@ -2,6 +2,13 @@
 
 These instructions apply to all projects unless overridden by a project-level CLAUDE.md.
 
+# Writing Style
+
+- Use clear, concise language
+- Use short sentences and paragraphs
+- Avoid "—" and other long dashes; use a single hyphen instead
+- Try to sound natural and human-like, not robotic or overly formal
+
 ## Code Style
 
 - Write clean, readable code with meaningful variable and function names
