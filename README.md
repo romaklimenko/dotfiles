@@ -21,7 +21,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Integrated as git submodule
   - Shared across Windows and Linux
 
-- **Claude Code Configuration:** Shared [Claude Code](https://claude.ai/claude-code) settings across machines
+- **Claude Code Configuration:** Shared [Claude Code](https://claude.ai/) settings across machines
   - Global `CLAUDE.md` instructions
   - Global settings (`settings.json`)
   - Custom slash commands
