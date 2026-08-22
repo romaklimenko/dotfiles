@@ -286,7 +286,7 @@ Write-Success "=================================================================
 Write-Host ""
 Write-Info "Next steps:"
 Write-Host "  1. Restart PowerShell or run: . `$PROFILE"
-Write-Host "  2. Verify `$env:HOME is set to C:\home"
+Write-Host "  2. Verify `$env:DEV_HOME is C:\home and `$env:DOTFILES_HOME is C:\home\dotfiles"
 Write-Host "  3. Test aliases: ll, gs, dots, etc."
 Write-Host ""
 

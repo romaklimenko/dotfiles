@@ -1,5 +1,7 @@
-# Set custom HOME directory - MUST be first line
-$env:HOME = "C:\home"
+# Personal roots. Deliberately NOT $env:HOME: setting HOME on Windows
+# redirects git, ssh, gnupg and friends away from the user profile.
+$env:DEV_HOME = "C:\home"
+$env:DOTFILES_HOME = "$env:DEV_HOME\dotfiles"
 
 # ============================================================================
 # PowerShell Profile for Windows
@@ -25,9 +27,9 @@ if (Get-Command nvim -ErrorAction SilentlyContinue) {
 # -----------------------------------------------------------------------------
 
 # Navigation shortcuts
-function cdh { Set-Location $env:HOME }
-function hh { if ($env:HOME) { Set-Location $env:HOME } }
-function dots { Set-Location "$env:HOME\dotfiles" }
+function cdh { Set-Location $env:DEV_HOME }
+function hh { Set-Location $env:DEV_HOME }
+function dots { Set-Location $env:DOTFILES_HOME }
 function .. { Set-Location .. }
 function ... { Set-Location ..\.. }
 function .... { Set-Location ..\..\.. }
@@ -67,7 +69,7 @@ function pp { . $PROFILE }
 
 # Apply dotfiles from local repo to system (for testing without committing)
 function dotsync {
-    $dotfilesPath = "$env:HOME\dotfiles"
+    $dotfilesPath = $env:DOTFILES_HOME
     Copy-Item "$dotfilesPath\windows\Microsoft.PowerShell_profile.ps1" $PROFILE -Force
     $claudeConfigPath = "$env:USERPROFILE\.claude"
     Copy-Item "$dotfilesPath\claude\settings.json" "$claudeConfigPath\settings.json" -Force
@@ -88,7 +90,7 @@ function dotsync {
 
 # Pull latest dotfiles from remote and apply
 function dotpull {
-    Push-Location "$env:HOME\dotfiles"
+    Push-Location $env:DOTFILES_HOME
     git pull
     Pop-Location
     dotsync
@@ -209,7 +211,7 @@ function prompt {
 # -----------------------------------------------------------------------------
 
 # Write-Host "PowerShell Profile Loaded" -ForegroundColor Green
-# Write-Host "HOME: $env:HOME" -ForegroundColor Cyan
+# Write-Host "DEV_HOME: $env:DEV_HOME" -ForegroundColor Cyan
 
 # -----------------------------------------------------------------------------
 # Load local overrides (if exists)

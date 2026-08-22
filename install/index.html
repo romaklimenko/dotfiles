@@ -802,7 +802,7 @@
   <h4>PowerShell Profile</h4>
   <p>Custom Windows PowerShell configuration with:</p>
 <ul>
-    <li><code>$env:HOME</code> set to <code>C:\home</code></li>
+    <li><code>$env:DEV_HOME</code> and <code>$env:DOTFILES_HOME</code> instead of overriding <code>$env:HOME</code></li>
     <li>Useful aliases and functions</li>
     <li>Git shortcuts</li>
     <li>WSL integration helpers</li>
@@ -851,9 +851,9 @@
 
                 <h2 id="powershell-reference">PowerShell Profile Reference</h2>
                 <!-- generated:start:powershell-reference -->
-<h3>Custom HOME</h3>
+<h3>Personal roots</h3>
 <ul>
-    <li><code>$env:HOME</code> set to <code>C:\home</code></li>
+    <li><code>$env:DEV_HOME</code> is <code>C:\home</code> and <code>$env:DOTFILES_HOME</code> is <code>C:\home\dotfiles</code>. <code>$env:HOME</code> is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile</li>
 </ul>
 
 <h3>Aliases</h3>
@@ -864,9 +864,8 @@
 
 <h3>Navigation Shortcuts</h3>
 <ul>
-    <li><code>cdh</code> - Go to HOME directory</li>
-    <li><code>hh</code> - Go to HOME directory (if set)</li>
-    <li><code>dots</code> - Go to dotfiles directory</li>
+    <li><code>cdh</code>, <code>hh</code> - Go to <code>$env:DEV_HOME</code></li>
+    <li><code>dots</code> - Go to <code>$env:DOTFILES_HOME</code></li>
     <li><code>..</code>, <code>...</code>, <code>....</code> - Go up 1, 2, or 3 directories</li>
 </ul>
 

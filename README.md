@@ -6,7 +6,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
 
 <!-- sync:features:start -->
 - **PowerShell Profile:** Custom Windows PowerShell configuration with:
-  - `$env:HOME` set to `C:\home`
+  - `$env:DEV_HOME` and `$env:DOTFILES_HOME` instead of overriding `$env:HOME`
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
@@ -284,14 +284,13 @@ chmod 644 ~/.bashrc ~/.bash_aliases ~/.zshrc ~/.profile
 The Windows PowerShell profile includes:
 
 <!-- sync:powershell-reference:start -->
-- **Custom HOME:** `$env:HOME` set to `C:\home`
+- **Personal roots:** `$env:DEV_HOME` is `C:\home` and `$env:DOTFILES_HOME` is `C:\home\dotfiles`. `$env:HOME` is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile
 - **Aliases:**
   - `ll`, `la` - List files
   - `vim`, `vi` - Opens Neovim (if installed)
 - **Navigation Shortcuts:**
-  - `cdh` - Go to HOME directory
-  - `hh` - Go to HOME directory (if set)
-  - `dots` - Go to dotfiles directory
+  - `cdh`, `hh` - Go to `$env:DEV_HOME`
+  - `dots` - Go to `$env:DOTFILES_HOME`
   - `..`, `...`, `....` - Go up 1, 2, or 3 directories
 - **Git Shortcuts:**
   - `gs` - git status
