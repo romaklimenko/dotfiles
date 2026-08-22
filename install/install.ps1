@@ -238,6 +238,38 @@ try {
     }
 }
 
+# Install hooks directory
+$claudeHooksSource = "$dotfilesPath\claude\hooks"
+$claudeHooksTarget = "$claudeConfigPath\hooks"
+if ((Test-Path $claudeHooksTarget) -and -not (Get-Item $claudeHooksTarget).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
+    if (-not $SkipBackup) {
+        $backupPath = "$claudeHooksTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Write-Warning "Backing up existing Claude Code hooks to:"
+        Write-Warning "  $backupPath"
+        Move-Item $claudeHooksTarget $backupPath
+    } else {
+        Remove-Item $claudeHooksTarget -Recurse -Force
+    }
+}
+try {
+    if (Test-Path $claudeHooksTarget) {
+        Remove-Item $claudeHooksTarget -Force
+    }
+    New-Item -ItemType SymbolicLink -Path $claudeHooksTarget -Target $claudeHooksSource -Force | Out-Null
+    Write-Success "Claude Code hooks symlinked to:"
+    Write-Success "  $claudeHooksTarget"
+} catch {
+    Write-Warning "Failed to create symlink for Claude Code hooks: $_"
+    Write-Warning "Falling back to copy..."
+    try {
+        Copy-Item $claudeHooksSource $claudeHooksTarget -Recurse -Force
+        Write-Success "Claude Code hooks copied to:"
+        Write-Success "  $claudeHooksTarget"
+    } catch {
+        Write-Warning "Failed to copy Claude Code hooks: $_"
+    }
+}
+
 Write-Success "Claude Code configuration installed"
 Write-Host ""
 
@@ -262,6 +294,10 @@ if (-not (Test-Path "$claudeConfigPath\settings.json")) {
 
 if (-not (Test-Path "$claudeConfigPath\commands")) {
     $issues += "Claude Code commands not found at $claudeConfigPath\commands"
+}
+
+if (-not (Test-Path "$claudeConfigPath\hooks")) {
+    $issues += "Claude Code hooks not found at $claudeConfigPath\hooks"
 }
 
 if ($issues.Count -eq 0) {

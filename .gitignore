@@ -64,6 +64,11 @@ tmp/
 local/
 private/
 
+# Mined lessons (may contain client detail - runtime state lives in ~/.claude)
+claude/lessons/
+**/pending.jsonl
+**/archive.jsonl
+
 # Shell history (if accidentally placed in repo)
 .bash_history
 .zsh_history

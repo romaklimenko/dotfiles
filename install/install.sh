@@ -190,6 +190,16 @@ ln -sf "$CLAUDE_COMMANDS_SOURCE" "$CLAUDE_COMMANDS_TARGET"
 print_success "Claude Code commands symlinked to:"
 print_success "  $CLAUDE_COMMANDS_TARGET"
 
+# Install hooks directory (symlink)
+CLAUDE_HOOKS_SOURCE="$DOTFILES_DIR/claude/hooks"
+CLAUDE_HOOKS_TARGET="$CLAUDE_CONFIG_DIR/hooks"
+if [ -d "$CLAUDE_HOOKS_TARGET" ] && [ ! -L "$CLAUDE_HOOKS_TARGET" ]; then
+    backup_file "$CLAUDE_HOOKS_TARGET"
+fi
+ln -sfn "$CLAUDE_HOOKS_SOURCE" "$CLAUDE_HOOKS_TARGET"
+print_success "Claude Code hooks symlinked to:"
+print_success "  $CLAUDE_HOOKS_TARGET"
+
 print_success "Claude Code configuration installed"
 echo ""
 
@@ -221,6 +231,7 @@ ISSUES=()
 [ ! -d "$NVIM_CONFIG" ] && ISSUES+=("Neovim config not found at $NVIM_CONFIG")
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
 [ ! -d "$CLAUDE_CONFIG_DIR/commands" ] && ISSUES+=("Claude Code commands not found at $CLAUDE_CONFIG_DIR/commands")
+[ ! -d "$CLAUDE_CONFIG_DIR/hooks" ] && ISSUES+=("Claude Code hooks not found at $CLAUDE_CONFIG_DIR/hooks")
 
 if [ ${#ISSUES[@]} -eq 0 ]; then
     print_success "All checks passed!"

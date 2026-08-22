@@ -84,6 +84,16 @@ function dotsync {
     } catch {
         Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
     }
+    $claudeHooksSource = "$dotfilesPath\claude\hooks"
+    $claudeHooksTarget = "$claudeConfigPath\hooks"
+    if (Test-Path $claudeHooksTarget) {
+        Remove-Item $claudeHooksTarget -Recurse -Force
+    }
+    try {
+        New-Item -ItemType SymbolicLink -Path $claudeHooksTarget -Target $claudeHooksSource -Force -ErrorAction Stop | Out-Null
+    } catch {
+        Copy-Item $claudeHooksSource $claudeHooksTarget -Recurse -Force
+    }
     Write-Host "Dotfiles applied from local repo" -ForegroundColor Green
     . $PROFILE
 }

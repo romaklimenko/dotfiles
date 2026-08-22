@@ -25,6 +25,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Global `CLAUDE.md` instructions
   - Global settings (`settings.json`)
   - Custom slash commands
+  - Automatic "lessons learned" capture on compaction and session end, curated with `/lessons`
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
   - Landing page with light and dark themes, matching the design of [klimenko.dk](https://klimenko.dk)
@@ -133,7 +134,8 @@ dotfiles/
 ├── claude/           # Claude Code configuration
 │   ├── CLAUDE.md     # Global instructions for all projects
 │   ├── settings.json # Global settings
-│   └── commands/     # Custom slash commands
+│   ├── commands/     # Custom slash commands
+│   └── hooks/        # Lesson capture hooks
 ├── install/          # Installation scripts and GitHub Pages
 │   ├── install.ps1   # Windows installer
 │   ├── install.sh    # Linux/macOS installer
@@ -345,6 +347,12 @@ The Claude Code configuration is shared across all platforms:
   - `/pr` - Generates a PR title and description in markdown vs main/master
   - `/remember` - Saves a project-level preference to CLAUDE.md for future sessions
   - `/remember-always` - Saves a global preference to ~/.claude/CLAUDE.md for all projects
+  - `/lessons` - Reviews lessons mined from past sessions and promotes the good ones
+- **Hooks:** Lesson capture hooks symlinked to `~/.claude/hooks/`
+  - `PreCompact` and `SessionEnd` enqueue a job, then a detached worker mines the transcript with a cheap model
+  - Mined lessons wait in `~/.claude/lessons/pending.jsonl` until `/lessons` curates them
+  - Runtime state lives in `~/.claude/lessons/`, outside this repository
+  - Escape hatches: `CC_LESSONS_DISABLE=1` to skip a session, `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_MIN_TURNS` (default `6`)
 
 ### Configuration Paths
 
