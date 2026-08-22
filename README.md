@@ -27,7 +27,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Custom slash commands
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
-  - Dark-themed landing page with quick install and reference sections
+  - Landing page with light and dark themes, matching the design of [klimenko.dk](https://klimenko.dk)
 <!-- sync:features:end -->
 
 ## Quick Start
