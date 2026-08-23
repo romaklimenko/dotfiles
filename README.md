@@ -350,6 +350,9 @@ The Claude Code configuration is shared across all platforms:
   - Mined lessons wait in `~/.claude/lessons/pending.jsonl` until `/lessons` curates them
   - Runtime state lives in `~/.claude/lessons/`, outside this repository
   - Escape hatches: `CC_LESSONS_DISABLE=1` to skip a session, `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_MIN_TURNS` (default `6`)
+  - The worker calls `claude -p` itself, so it clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
+- **Symlink fallback:** On Windows, `dotsync` symlinks `commands/` and `hooks/` only when Developer Mode is on or the shell is elevated. Otherwise it copies them. A copied directory means edits in this repository do not go live until `dotsync` runs again
+  - Check which you have with `Get-Item ~/.claude/hooks | Select-Object LinkType`
 
 ### Configuration Paths
 

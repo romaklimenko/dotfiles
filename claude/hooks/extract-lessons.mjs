@@ -90,19 +90,30 @@ function digest(transcriptPath, from) {
 }
 
 function runClaude(prompt) {
+  // CLAUDECODE is inherited from the session that spawned this worker, and the
+  // CLI refuses to start when it sees it ("cannot be launched inside another
+  // Claude Code session"). CC_LESSONS_CHILD is our own recursion guard and is
+  // not a substitute for clearing it.
+  const env = { ...process.env, CC_LESSONS_CHILD: "1" };
+  delete env.CLAUDECODE;
+
+  // The prompt goes on stdin, never argv: a digest of MAX_CHARS is far past the
+  // ~32k Windows command-line limit and spawn fails with ENAMETOOLONG. Keeping
+  // it off argv also keeps transcript text out of any error message we log.
   return execFileSync(
     CLAUDE_BIN,
     [
-      "-p", prompt,
+      "-p",
       "--model", MODEL,
       "--settings", '{"disableAllHooks":true}',
     ],
     {
+      input: prompt,
       encoding: "utf8",
       timeout: 180_000,
       maxBuffer: 8 * 1024 * 1024,
       windowsHide: true,
-      env: { ...process.env, CC_LESSONS_CHILD: "1" },
+      env,
     },
   );
 }
@@ -170,7 +181,7 @@ try {
       rmSync(path, { force: true });
       log(`${job.session_id} ${job.event} turns=${turns} lessons=${lessons.length}`);
     } catch (err) {
-      log(`FAIL ${job.session_id}: ${err.message}`);
+      log(`FAIL ${job.session_id}: ${String(err.message).replace(/\s+/g, " ").slice(0, 500)}`);
       rmSync(path, { force: true }); // never let one bad job wedge the queue
     }
   }
