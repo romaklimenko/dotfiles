@@ -39,7 +39,34 @@ if (existsSync(LOCK) && Date.now() - statSync(LOCK).mtimeMs < 10 * 60 * 1000) {
   process.exit(0);
 }
 writeFileSync(LOCK, String(process.pid), "utf8");
-const release = () => { try { rmSync(LOCK, { force: true }); } catch {} };
+
+// Re-stamp the lock so a run that outlives LOCK_STALE_MS is not mistaken for a
+// dead one. This has to be called between jobs: runClaude blocks the event loop
+// for up to its full timeout, so a timer-based heartbeat would never fire.
+//
+// Returns false if the lock now belongs to someone else, which means this worker
+// was already presumed dead and taken over. Yield rather than re-claim it: two
+// workers on one queue mine the same job twice and race on the state cursor. The
+// jobs left behind stay queued for whoever holds the lock.
+const holdLock = () => {
+  try {
+    if (existsSync(LOCK) && readFileSync(LOCK, "utf8").trim() !== String(process.pid)) return false;
+    writeFileSync(LOCK, String(process.pid), "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Only drop the lock if it is still ours. A worker that took over a stale lock
+// has already claimed it, and deleting that one would let a third worker in.
+const release = () => {
+  try {
+    if (existsSync(LOCK) && readFileSync(LOCK, "utf8").trim() === String(process.pid)) {
+      rmSync(LOCK, { force: true });
+    }
+  } catch {}
+};
 process.on("exit", release);
 
 // The transcript file is written asynchronously and lags the live session.
@@ -140,6 +167,7 @@ try {
     : [];
 
   for (const f of jobs) {
+    if (!holdLock()) { log("yielding: lock taken over by another worker"); break; }
     const path = join(QUEUE, f);
     let job;
     try { job = JSON.parse(readFileSync(path, "utf8")); } catch { rmSync(path, { force: true }); continue; }
