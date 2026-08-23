@@ -340,6 +340,7 @@ The Windows PowerShell profile includes:
 The Claude Code configuration is shared across all platforms:
 
 - **Global CLAUDE.md:** Instructions that apply to all projects, copied to `~/.claude/CLAUDE.md`
+  - Writing style, human-readable output rules, code style, git, and security guidelines
 - **Settings:** Global `settings.json` copied to `~/.claude/settings.json`
   - `denyRead` rules to prevent reading `.env` files
 - **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
