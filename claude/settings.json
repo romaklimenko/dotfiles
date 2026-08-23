@@ -57,6 +57,5 @@
     ]
   },
   "voiceEnabled": true,
-  "skipAutoPermissionPrompt": true,
-  "effortLevel": "max"
+  "skipAutoPermissionPrompt": true
 }
