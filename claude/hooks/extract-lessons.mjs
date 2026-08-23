@@ -70,9 +70,14 @@ function textOf(content) {
 // Build a digest of transcript lines [from, end). Returns { digest, turns, next }.
 function digest(transcriptPath, from) {
   const lines = readFileSync(transcriptPath, "utf8").split("\n");
+  // The last element is never a complete record. A finished JSONL file ends in a
+  // newline, which leaves an empty string, and a file caught mid-write ends in a
+  // partial line. Stopping before it keeps the cursor from skipping the record
+  // that lands there next, and lets a torn record be re-read once it is whole.
+  const end = Math.max(0, lines.length - 1);
   const parts = [];
   let turns = 0;
-  for (let i = from; i < lines.length; i++) {
+  for (let i = from; i < end; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     let e;
@@ -86,7 +91,7 @@ function digest(transcriptPath, from) {
   }
   let d = parts.join("\n\n");
   if (d.length > MAX_CHARS) d = `[...truncated...]\n${d.slice(-MAX_CHARS)}`;
-  return { digest: d, turns, next: lines.length };
+  return { digest: d, turns, next: end };
 }
 
 function runClaude(prompt) {
