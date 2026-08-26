@@ -86,3 +86,25 @@ hard-to-parse prose is not.
 - Never commit secrets, API keys, tokens, or passwords
 - Never commit .env files with real values
 - If you spot a potential secret in code, flag it immediately
+
+## Lessons learned
+
+- Windows `New-Item -SymbolicLink` fails silently without elevation or
+  Developer Mode and install scripts fall back to copies. Verify with
+  `test -L` instead of trusting the script.
+- Delete `CLAUDECODE` from the environment before spawning a child `claude`
+  process, or it refuses with "cannot be launched inside another Claude Code
+  session".
+- Windows caps a command line at about 32 KB. Pass large prompts to
+  `claude -p` through stdin, never argv.
+- An unquoted heredoc eats backslashes and corrupts regexes. Patch code with
+  the Edit tool or quote the delimiter (`<<'EOF'`).
+- Never write census counts or live-state inventories into docs or notebooks;
+  they drift. State the invariant and point at what reports the current state.
+- When a parent PR is squash-merged, a stacked PR loses its base. Rebase the
+  child onto the new main and force-push before retargeting.
+- Never test a git hook through `| head`. SIGPIPE kills the hook and git
+  treats the failure as success.
+- Python in Bash on Windows prints with cp1252. Call
+  `sys.stdout.reconfigure(encoding="utf-8")` before printing anything
+  non-ASCII.
