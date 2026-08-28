@@ -16,6 +16,19 @@ function Write-Info { Write-Host $args -ForegroundColor Cyan }
 function Write-Warning { Write-Host $args -ForegroundColor Yellow }
 function Write-Error { Write-Host $args -ForegroundColor Red }
 
+# Remove a directory symlink or junction without following it, or a real
+# directory with its contents. Windows PowerShell 5.1 follows links on
+# Remove-Item -Recurse and would wipe the dotfiles repository behind them.
+function Remove-LinkOrDirectory($path) {
+    if (-not (Test-Path $path)) { return }
+    $item = Get-Item $path -Force
+    if ($item.Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
+        [System.IO.Directory]::Delete($path)
+    } else {
+        Remove-Item $path -Recurse -Force
+    }
+}
+
 Write-Info "============================================================================"
 Write-Info "Installing dotfiles for Windows..."
 Write-Info "============================================================================"
@@ -221,7 +234,7 @@ if ((Test-Path $claudeCommandsTarget) -and -not (Get-Item $claudeCommandsTarget)
 }
 try {
     if (Test-Path $claudeCommandsTarget) {
-        Remove-Item $claudeCommandsTarget -Force
+        Remove-LinkOrDirectory $claudeCommandsTarget
     }
     New-Item -ItemType SymbolicLink -Path $claudeCommandsTarget -Target $claudeCommandsSource -Force | Out-Null
     Write-Success "Claude Code commands symlinked to:"
@@ -230,6 +243,7 @@ try {
     Write-Warning "Failed to create symlink for Claude Code commands: $_"
     Write-Warning "Falling back to copy..."
     try {
+        Remove-LinkOrDirectory $claudeCommandsTarget
         Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
         Write-Success "Claude Code commands copied to:"
         Write-Success "  $claudeCommandsTarget"
@@ -253,7 +267,7 @@ if ((Test-Path $claudeHooksTarget) -and -not (Get-Item $claudeHooksTarget).Attri
 }
 try {
     if (Test-Path $claudeHooksTarget) {
-        Remove-Item $claudeHooksTarget -Force
+        Remove-LinkOrDirectory $claudeHooksTarget
     }
     New-Item -ItemType SymbolicLink -Path $claudeHooksTarget -Target $claudeHooksSource -Force | Out-Null
     Write-Success "Claude Code hooks symlinked to:"
@@ -262,11 +276,42 @@ try {
     Write-Warning "Failed to create symlink for Claude Code hooks: $_"
     Write-Warning "Falling back to copy..."
     try {
+        Remove-LinkOrDirectory $claudeHooksTarget
         Copy-Item $claudeHooksSource $claudeHooksTarget -Recurse -Force
         Write-Success "Claude Code hooks copied to:"
         Write-Success "  $claudeHooksTarget"
     } catch {
         Write-Warning "Failed to copy Claude Code hooks: $_"
+    }
+}
+
+# Install global git ignore. Git reads ~/.config/git/ignore when
+# core.excludesFile is unset. It keeps LESSONS.md, written by the Claude Code
+# lessons hook, out of every repository unless a project opts in.
+$gitIgnoreSource = "$dotfilesPath\git\ignore"
+$gitConfigHome = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { "$env:USERPROFILE\.config" }
+$gitIgnoreTarget = "$gitConfigHome\git\ignore"
+$gitExcludesFile = git config --global --get core.excludesFile 2>$null
+if ($gitExcludesFile) {
+    Write-Warning "core.excludesFile is set to $gitExcludesFile"
+    Write-Warning "  Add the patterns from $gitIgnoreSource to it yourself"
+} else {
+    try {
+        New-Item -ItemType Directory -Path (Split-Path $gitIgnoreTarget) -Force | Out-Null
+        if (-not (Test-Path $gitIgnoreTarget)) {
+            Copy-Item $gitIgnoreSource $gitIgnoreTarget -Force
+        } else {
+            # Keep whatever is there. Append only the patterns that are missing.
+            $existing = @(Get-Content $gitIgnoreTarget)
+            $missing = @(Get-Content $gitIgnoreSource | Where-Object { $_ -and -not $_.StartsWith('#') -and ($existing -notcontains $_) })
+            if ($missing.Count -gt 0) {
+                Add-Content $gitIgnoreTarget -Value (@('', '# Added from dotfiles (git/ignore)') + $missing)
+            }
+        }
+        Write-Success "Global git ignore installed to:"
+        Write-Success "  $gitIgnoreTarget"
+    } catch {
+        Write-Warning "Failed to install global git ignore: $_"
     }
 }
 
@@ -298,6 +343,10 @@ if (-not (Test-Path "$claudeConfigPath\commands")) {
 
 if (-not (Test-Path "$claudeConfigPath\hooks")) {
     $issues += "Claude Code hooks not found at $claudeConfigPath\hooks"
+}
+
+if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
+    $issues += "Global git ignore not found at $gitIgnoreTarget"
 }
 
 if ($issues.Count -eq 0) {

@@ -67,6 +67,29 @@ function dfs { databricks fs $args }
 # Profile management
 function pp { . $PROFILE }
 
+# Remove a directory symlink without following it, or a real directory with
+# its contents. Windows PowerShell 5.1 follows links on Remove-Item -Recurse.
+function Remove-LinkOrDirectory($path) {
+    if (-not (Test-Path $path)) { return }
+    $item = Get-Item $path -Force
+    if ($item.Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
+        [System.IO.Directory]::Delete($path)
+    } else {
+        Remove-Item $path -Recurse -Force
+    }
+}
+
+# Symlink a repo directory into place, or copy it when symlinks are not allowed.
+function Link-OrCopyDirectory($source, $target) {
+    Remove-LinkOrDirectory $target
+    try {
+        New-Item -ItemType SymbolicLink -Path $target -Target $source -Force -ErrorAction Stop | Out-Null
+    } catch {
+        Remove-LinkOrDirectory $target
+        Copy-Item $source $target -Recurse -Force
+    }
+}
+
 # Apply dotfiles from local repo to system (for testing without committing)
 function dotsync {
     $dotfilesPath = $env:DOTFILES_HOME
@@ -74,25 +97,26 @@ function dotsync {
     $claudeConfigPath = "$env:USERPROFILE\.claude"
     Copy-Item "$dotfilesPath\claude\settings.json" "$claudeConfigPath\settings.json" -Force
     Copy-Item "$dotfilesPath\claude\CLAUDE.md" "$claudeConfigPath\CLAUDE.md" -Force
-    $claudeCommandsSource = "$dotfilesPath\claude\commands"
-    $claudeCommandsTarget = "$claudeConfigPath\commands"
-    if (Test-Path $claudeCommandsTarget) {
-        Remove-Item $claudeCommandsTarget -Recurse -Force
-    }
-    try {
-        New-Item -ItemType SymbolicLink -Path $claudeCommandsTarget -Target $claudeCommandsSource -Force -ErrorAction Stop | Out-Null
-    } catch {
-        Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
-    }
-    $claudeHooksSource = "$dotfilesPath\claude\hooks"
-    $claudeHooksTarget = "$claudeConfigPath\hooks"
-    if (Test-Path $claudeHooksTarget) {
-        Remove-Item $claudeHooksTarget -Recurse -Force
-    }
-    try {
-        New-Item -ItemType SymbolicLink -Path $claudeHooksTarget -Target $claudeHooksSource -Force -ErrorAction Stop | Out-Null
-    } catch {
-        Copy-Item $claudeHooksSource $claudeHooksTarget -Recurse -Force
+    Link-OrCopyDirectory "$dotfilesPath\claude\commands" "$claudeConfigPath\commands"
+    Link-OrCopyDirectory "$dotfilesPath\claude\hooks" "$claudeConfigPath\hooks"
+    # Global git ignore keeps LESSONS.md out of every repository by default.
+    # Existing content is kept; only missing patterns are appended.
+    $gitExcludesFile = git config --global --get core.excludesFile 2>$null
+    if ($gitExcludesFile) {
+        Write-Host "core.excludesFile is set to $gitExcludesFile; add the patterns from git\ignore yourself" -ForegroundColor Yellow
+    } else {
+        $gitConfigHome = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { "$env:USERPROFILE\.config" }
+        $gitIgnoreTarget = "$gitConfigHome\git\ignore"
+        New-Item -ItemType Directory -Path "$gitConfigHome\git" -Force | Out-Null
+        if (-not (Test-Path $gitIgnoreTarget)) {
+            Copy-Item "$dotfilesPath\git\ignore" $gitIgnoreTarget -Force
+        } else {
+            $existing = @(Get-Content $gitIgnoreTarget)
+            $missing = @(Get-Content "$dotfilesPath\git\ignore" | Where-Object { $_ -and -not $_.StartsWith('#') -and ($existing -notcontains $_) })
+            if ($missing.Count -gt 0) {
+                Add-Content $gitIgnoreTarget -Value (@('', '# Added from dotfiles (git/ignore)') + $missing)
+            }
+        }
     }
     Write-Host "Dotfiles applied from local repo" -ForegroundColor Green
     . $PROFILE

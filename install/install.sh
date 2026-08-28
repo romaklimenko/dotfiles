@@ -87,7 +87,7 @@ echo ""
 
 backup_file() {
     local file=$1
-    if [ -f "$file" ] || [ -L "$file" ]; then
+    if [ -e "$file" ] || [ -L "$file" ]; then
         local backup="$file.backup-$(date +%Y%m%d-%H%M%S)"
         print_warning "Backing up existing file to:"
         print_warning "  $backup"
@@ -186,11 +186,14 @@ CLAUDE_COMMANDS_TARGET="$CLAUDE_CONFIG_DIR/commands"
 if [ -d "$CLAUDE_COMMANDS_TARGET" ] && [ ! -L "$CLAUDE_COMMANDS_TARGET" ]; then
     backup_file "$CLAUDE_COMMANDS_TARGET"
 fi
-ln -sf "$CLAUDE_COMMANDS_SOURCE" "$CLAUDE_COMMANDS_TARGET"
+ln -sfn "$CLAUDE_COMMANDS_SOURCE" "$CLAUDE_COMMANDS_TARGET"
 print_success "Claude Code commands symlinked to:"
 print_success "  $CLAUDE_COMMANDS_TARGET"
 
-# Install hooks directory (symlink)
+# Install hooks directory (symlink). The hooks are Node.js scripts.
+if ! command -v node &> /dev/null; then
+    print_warning "node was not found. The Claude Code hooks need Node.js 20 or newer to run."
+fi
 CLAUDE_HOOKS_SOURCE="$DOTFILES_DIR/claude/hooks"
 CLAUDE_HOOKS_TARGET="$CLAUDE_CONFIG_DIR/hooks"
 if [ -d "$CLAUDE_HOOKS_TARGET" ] && [ ! -L "$CLAUDE_HOOKS_TARGET" ]; then
@@ -199,6 +202,35 @@ fi
 ln -sfn "$CLAUDE_HOOKS_SOURCE" "$CLAUDE_HOOKS_TARGET"
 print_success "Claude Code hooks symlinked to:"
 print_success "  $CLAUDE_HOOKS_TARGET"
+
+# Install global git ignore. Git reads ~/.config/git/ignore when
+# core.excludesFile is unset. It keeps LESSONS.md, written by the Claude Code
+# lessons hook, out of every repository unless a project opts in.
+GIT_IGNORE_SOURCE="$DOTFILES_DIR/git/ignore"
+GIT_IGNORE_TARGET="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
+GIT_EXCLUDES_FILE="$(git config --global --get core.excludesFile 2>/dev/null || true)"
+if [ -n "$GIT_EXCLUDES_FILE" ]; then
+    print_warning "core.excludesFile is set to $GIT_EXCLUDES_FILE"
+    print_warning "  Add the patterns from $GIT_IGNORE_SOURCE to it yourself"
+else
+    mkdir -p "$(dirname "$GIT_IGNORE_TARGET")"
+    if [ ! -f "$GIT_IGNORE_TARGET" ]; then
+        cp "$GIT_IGNORE_SOURCE" "$GIT_IGNORE_TARGET"
+    else
+        # Keep whatever is there. Append only the patterns that are missing.
+        added=0
+        while IFS= read -r pattern || [ -n "$pattern" ]; do
+            case "$pattern" in ''|'#'*) continue ;; esac
+            if ! grep -qxF -- "$pattern" "$GIT_IGNORE_TARGET"; then
+                [ "$added" -eq 0 ] && printf '\n# Added from dotfiles (git/ignore)\n' >> "$GIT_IGNORE_TARGET"
+                printf '%s\n' "$pattern" >> "$GIT_IGNORE_TARGET"
+                added=1
+            fi
+        done < "$GIT_IGNORE_SOURCE"
+    fi
+    print_success "Global git ignore installed to:"
+    print_success "  $GIT_IGNORE_TARGET"
+fi
 
 print_success "Claude Code configuration installed"
 echo ""
@@ -232,6 +264,7 @@ ISSUES=()
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
 [ ! -d "$CLAUDE_CONFIG_DIR/commands" ] && ISSUES+=("Claude Code commands not found at $CLAUDE_CONFIG_DIR/commands")
 [ ! -d "$CLAUDE_CONFIG_DIR/hooks" ] && ISSUES+=("Claude Code hooks not found at $CLAUDE_CONFIG_DIR/hooks")
+[ -z "$GIT_EXCLUDES_FILE" ] && [ ! -f "$GIT_IGNORE_TARGET" ] && ISSUES+=("Global git ignore not found at $GIT_IGNORE_TARGET")
 
 if [ ${#ISSUES[@]} -eq 0 ]; then
     print_success "All checks passed!"

@@ -1,55 +1,31 @@
 ---
-description: Review lessons mined from past sessions and promote the good ones
-allowed-tools: Read, Write, Edit, Bash(ls:*), Bash(cat:*), Bash(wc:*)
+description: Show where session notes live and whether the pipeline is healthy; `tidy <path>` merges one file
+argument-hint: [tidy <path>]
+allowed-tools: Read, Write, Bash(node:*), Bash(git diff:*), Bash(git status:*), Bash(git ls-files:*), Bash(git add:*), Bash(git commit:*)
 ---
 
-Curate the lessons queue. Automatic extraction is deliberately generous; this
-command is the filter, and it is the only thing that writes to a CLAUDE.md.
+Session notes are written to `LESSONS.md` files by a background worker and
+read at session start. This command shows them; it never writes to CLAUDE.md.
 
-## 1. Load
+## Default: report
 
-Read `~/.claude/lessons/pending.jsonl` (one JSON object per line). If it is
-missing or empty, say so and stop.
+Run `node "$HOME/.claude/hooks/lessons-context.mjs" --report` and print its
+output unchanged. Then stop. Do not summarise the lessons, do not edit
+anything, do not offer to.
 
-Also read, for comparison:
-- `~/.claude/CLAUDE.md` — where global lessons go
-- `./CLAUDE.md` in the current project, if present — where project lessons go
+## `tidy <path>`
 
-## 2. Triage
+Only when the argument is `tidy` followed by a path to a `LESSONS.md`.
 
-Group the pending entries. For each, decide:
-
-- **Duplicate** — the same point is already in one of the CLAUDE.md files, or
-  another pending entry says it better. Merge into the stronger wording.
-- **Stale** — refers to a project or tool the user has moved on from, or to a
-  bug that has since been fixed. Drop.
-- **Too generic** — would apply to any codebase. Drop, no matter how true.
-- **Keep** — specific, actionable, still true.
-
-Entries with `scope: "project"` belong in that project's CLAUDE.md, not the
-global one. If the entry's `project` field does not match the current working
-directory, hold it rather than writing it somewhere wrong.
-
-## 3. Present
-
-Show the user a compact table of what you propose to keep, with the target
-file for each, plus counts of what you dropped and why. Do not write anything
-yet. Wait for confirmation.
-
-## 4. Apply
-
-On confirmation:
-- Append kept lessons under a `## Lessons learned` heading in the target file,
-  as terse imperative bullets. Rewrite them to match the surrounding style —
-  do not paste the raw `lesson` field verbatim.
-- Never copy a client name, hostname, path, or identifier into
-  `~/.claude/CLAUDE.md`.
-- Rewrite `~/.claude/lessons/pending.jsonl` containing only the entries that
-  were held for another project. Everything processed is removed.
-- Append the applied entries to `~/.claude/lessons/archive.jsonl`.
-
-## Notes
-
-If the CLAUDE.md `## Lessons learned` section grows past roughly 30 bullets,
-say so and offer to consolidate it before appending more. A lessons file
-nobody reads is worse than no lessons file.
+1. Read the file. The first line must be
+   `<!-- claude-code lessons, auto-written -->`. If it is not, say the file
+   was not written by the hook and stop.
+2. Draft a merged version: combine bullets that say the same thing, drop
+   bullets that are stale or would apply to any project, keep every bullet
+   that is specific and still true. Keep the marker, the heading and the
+   intro paragraph exactly. Keep the `- [YYYY-MM-DD] ` prefix, using the
+   newest date of the bullets you merged. Do not add new lessons.
+3. Show the user a diff of the change and the counts before and after.
+   Wait for confirmation.
+4. On confirmation write the file. If it is tracked by git, commit it alone
+   with the message `Tidy LESSONS.md`. Otherwise do not stage it.

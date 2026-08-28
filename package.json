@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "sync:docs": "node scripts/sync-readme-to-install.mjs --write",
-    "sync:docs:check": "node scripts/sync-readme-to-install.mjs --check"
+    "sync:docs:check": "node scripts/sync-readme-to-install.mjs --check",
+    "test": "node --test tests/lessons.test.mjs"
   }
 }

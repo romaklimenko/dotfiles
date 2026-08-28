@@ -25,7 +25,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Global `CLAUDE.md` instructions
   - Global settings (`settings.json`)
   - Custom slash commands
-  - Automatic "lessons learned" capture on compaction and session end, curated with `/lessons`
+  - Session notes: a hook writes lessons from every session to `LESSONS.md` files and reads them back at session start. `/lessons` shows where they are
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
   - Landing page with light and dark themes, matching the design of [klimenko.dk](https://klimenko.dk)
@@ -75,11 +75,14 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install Claude Code configuration:
+5. Install Claude Code configuration and the global git ignore:
 ```powershell
 Copy-Item .\claude\settings.json "$env:USERPROFILE\.claude\settings.json" -Force
 Copy-Item .\claude\CLAUDE.md "$env:USERPROFILE\.claude\CLAUDE.md" -Force
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "C:\home\dotfiles\claude\commands" -Force
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\hooks" -Target "C:\home\dotfiles\claude\hooks" -Force
+New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\git" -Force
+Copy-Item .\git\ignore "$env:USERPROFILE\.config\git\ignore" -Force
 ```
 
 6. Reload profile:
@@ -111,12 +114,14 @@ mkdir -p ~/.config
 ln -sf ~/dotfiles/nvim ~/.config/nvim
 ```
 
-4. Install Claude Code configuration:
+4. Install Claude Code configuration and the global git ignore:
 ```bash
-mkdir -p ~/.claude
+mkdir -p ~/.claude ~/.config/git
 cp ~/dotfiles/claude/settings.json ~/.claude/settings.json
 cp ~/dotfiles/claude/CLAUDE.md ~/.claude/CLAUDE.md
-ln -sf ~/dotfiles/claude/commands ~/.claude/commands
+ln -sfn ~/dotfiles/claude/commands ~/.claude/commands
+ln -sfn ~/dotfiles/claude/hooks ~/.claude/hooks
+cp ~/dotfiles/git/ignore ~/.config/git/ignore
 ```
 
 5. Reload shell:
@@ -135,7 +140,10 @@ dotfiles/
 │   ├── CLAUDE.md     # Global instructions for all projects
 │   ├── settings.json # Global settings
 │   ├── commands/     # Custom slash commands
-│   └── hooks/        # Lesson capture hooks
+│   └── hooks/        # Session notes: SessionStart reader, enqueue hook, worker
+├── git/
+│   └── ignore        # Global git ignore, installed to ~/.config/git/ignore
+├── tests/            # node --test suite for the hooks (npm test)
 ├── install/          # Installation scripts and GitHub Pages
 │   ├── install.ps1   # Windows installer
 │   ├── install.sh    # Linux/macOS installer
@@ -250,6 +258,7 @@ Create `~/.bashrc.local` (gitignored) and source it from `.bashrc`.
 - Git
 - PowerShell (Windows)
 - Bash/Zsh (Linux)
+- Node.js 20 or newer (for the Claude Code hooks)
 - Neovim (optional, for nvim config)
 
 ## Troubleshooting
@@ -344,13 +353,19 @@ The Claude Code configuration is shared across all platforms:
 - **Settings:** Global `settings.json` copied to `~/.claude/settings.json`
   - `denyRead` rules to prevent reading `.env` files
 - **Custom Commands:** Slash commands symlinked to `~/.claude/commands/`
-  - `/lessons` - Reviews lessons mined from past sessions and promotes the good ones
-- **Hooks:** Lesson capture hooks symlinked to `~/.claude/hooks/`
-  - `PreCompact` and `SessionEnd` enqueue a job, then a detached worker mines the transcript with a cheap model
-  - Mined lessons wait in `~/.claude/lessons/pending.jsonl` until `/lessons` curates them
-  - Runtime state lives in `~/.claude/lessons/`, outside this repository
-  - Escape hatches: `CC_LESSONS_DISABLE=1` to skip a session, `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_MIN_TURNS` (default `6`)
-  - The worker calls `claude -p` itself, so it clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
+  - `/lessons` - Shows which `LESSONS.md` files apply to the current directory and whether the pipeline is healthy. `/lessons tidy <path>` merges one file while you watch
+- **Hooks:** Session notes, symlinked to `~/.claude/hooks/`
+  - `SessionStart` runs `lessons-context.mjs`. It injects every `LESSONS.md` that applies to the working directory: the directory itself, each parent up to the root, the project's out-of-tree copy under `~/.claude/lessons/projects/`, then `~/.claude/LESSONS.md`. Big files are clipped to head and tail. Files without the marker, or reached through a symlink, are listed by path but not injected. `SessionStart` also wakes the worker so it can sweep
+  - `Stop` (at most once per 30 minutes per session), `PreCompact` and `SessionEnd` run `enqueue-lesson.mjs`. It queues a job and detaches `extract-lessons.mjs`
+  - The worker reads the part of the transcript it has not seen, asks a cheap model for at most three lessons per chunk, and appends them as `- [date] lesson` bullets. Global lessons go to `~/.claude/LESSONS.md`, project lessons to `<repo>/LESSONS.md`. The evidence for each bullet goes to `~/.claude/lessons/log.jsonl`
+  - The worker also sweeps `~/.claude/projects/` for transcripts that went quiet without a `SessionEnd`, so a killed window still gets its retrospective
+  - A project file is written in-tree only when git is proven to ignore it or the project already tracks it. Otherwise it goes to `~/.claude/lessons/projects/<slug>/LESSONS.md`. A `LESSONS.md` without the `<!-- claude-code lessons, auto-written -->` marker is never touched
+  - Nothing is curated into any `CLAUDE.md`. To share a project's notes with a team, run `git add -f LESSONS.md` once. From then on Claude commits changes to it in a commit of their own. Everything the worker appends to a tracked file gets committed, so track a file only where that is fine
+  - A failed model call is retried with a growing backoff (one hour per attempt) and given up after five attempts; the log says which lines were skipped
+  - Escape hatches: `CC_LESSONS_DISABLE=1` skips a session (the sweep honours it too), `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_MIN_TURNS` (default `6`, for `Stop`), `CC_LESSONS_MIN_TURNS_FINAL` (default `3`, for `SessionEnd`, `PreCompact` and the sweep), `CC_LESSONS_STOP_MINUTES` (default `30`)
+  - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
+  - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline against a fake `claude`
+- **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
 - **Symlink fallback:** On Windows, `dotsync` symlinks `commands/` and `hooks/` only when Developer Mode is on or the shell is elevated. Otherwise it copies them. A copied directory means edits in this repository do not go live until `dotsync` runs again
   - Check which you have with `Get-Item ~/.claude/hooks | Select-Object LinkType`
 
