@@ -2,7 +2,11 @@
 // Detached worker. Drains ~/.claude/lessons/queue: for each job it reads the
 // part of the transcript it has not seen, asks a cheap model for lessons, and
 // appends them to LESSONS.md files. Then it sweeps ~/.claude/projects for
-// transcripts no hook reached. Nothing here runs inside a session.
+// transcripts no hook reached, and compacts any file it made too big.
+// Nothing here runs inside a session.
+//
+// `--compact <path>` compacts one file now, whatever its size, and prints
+// what happened. /lessons compact uses it.
 
 import {
   mkdirSync, existsSync, readFileSync, appendFileSync, readdirSync, rmSync,
@@ -10,11 +14,15 @@ import {
   createReadStream, utimesSync,
 } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as L from "./lessons-lib.mjs";
 
 const MODEL = process.env.CC_LESSONS_MODEL || "haiku";
+// Merging notes without losing facts is harder than mining them, and runs
+// far less often, so it gets a stronger model.
+const COMPACT_MODEL = process.env.CC_LESSONS_COMPACT_MODEL || "sonnet";
 // Stop fires mid-session; anything shorter than this waits for more turns.
 const MIN_TURNS = Number(process.env.CC_LESSONS_MIN_TURNS || 6);
 // SessionEnd, PreCompact and the sweep are the last chance for a segment.
@@ -26,6 +34,26 @@ const MAX_RETRIES = Number(process.env.CC_LESSONS_MAX_RETRIES || 5);
 // Attempt n waits n times this long. Rate-limit windows last hours.
 const RETRY_BACKOFF_MS = Number(process.env.CC_LESSONS_RETRY_BACKOFF_MS ?? 60 * 60 * 1000);
 const KNOWN_MAX_CHARS = 64 * 1024;
+// A file this big gets compacted after the run. Below the 12288 characters
+// the session-start hook injects whole, so a compacted file is never clipped.
+const COMPACT_AT = Number(process.env.CC_LESSONS_COMPACT_AT_CHARS || 10 * 1024);
+// One compaction per file per day at most, whatever the outcome.
+const COMPACT_INTERVAL_MS = Number(process.env.CC_LESSONS_COMPACT_HOURS ?? 24) * 60 * 60 * 1000;
+// After a refused rewrite, wait this much longer: nothing about the file has
+// changed, so a retry tomorrow would fail the same way.
+const REJECT_INTERVAL_MS = Number(process.env.CC_LESSONS_COMPACT_REJECT_HOURS ?? 24 * 7) * 60 * 60 * 1000;
+// A rewrite that keeps fewer than this share of the bullets is refused: the
+// model dropped facts instead of merging them.
+const COMPACT_MIN_KEEP = 0.4;
+// A rewrite earns its keep by merging this share of the bullets away, or by
+// shrinking the file by COMPACT_MIN_GAIN. One or the other is enough: a
+// faithful merge keeps every detail, so it drops bullets long before it
+// drops characters.
+const COMPACT_MIN_DROP = 0.05;
+const COMPACT_MIN_GAIN = 0.1;
+// A rewrite must carry over at least this share of the distinctive details
+// (flags, identifiers, error constants, versions) it was given.
+const COMPACT_MIN_FACTS = 0.9;
 const CLAUDE_BIN = process.env.CC_LESSONS_CLAUDE_BIN || "claude";
 const CLAUDE_TIMEOUT_MS = Number(process.env.CC_LESSONS_TIMEOUT_MS || 180_000);
 const STARTUP_DELAY_MS = Number(process.env.CC_LESSONS_STARTUP_DELAY_MS ?? 3000);
@@ -37,12 +65,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const short = (err) => String(err?.message ?? err).replace(/\s+/g, " ").slice(0, 300);
+const today = () => new Date().toISOString().slice(0, 10);
 
 class LockLost extends Error {}
 
 // --- lock ---------------------------------------------------------------
 
-for (const d of [L.ROOT, L.QUEUE, L.STATE, L.FAILED]) mkdirSync(d, { recursive: true });
+for (const d of [L.ROOT, L.QUEUE, L.STATE, L.FAILED, L.THROTTLE]) mkdirSync(d, { recursive: true });
 
 // `wx` makes creation atomic. A stale lock is removed once and creation is
 // retried; the pid check in holdLock() settles any remaining race.
@@ -92,12 +121,15 @@ function release() {
   } catch {}
 }
 
-if (!acquireLock()) process.exit(0);
+const compactArg = process.argv.indexOf("--compact");
+const compactOnly = compactArg !== -1 ? resolve(process.argv[compactArg + 1] ?? "") : null;
+
+if (!acquireLock()) {
+  if (compactOnly) process.stdout.write("skipped: another worker holds the lock, try again in a minute\n");
+  process.exit(0);
+}
 process.on("exit", release);
 L.trimLog();
-
-// The transcript file is written asynchronously and lags the live session.
-await sleep(STARTUP_DELAY_MS);
 
 // --- transcript reading -------------------------------------------------
 
@@ -298,6 +330,7 @@ function inBackoff(entry) {
 // --- model call ---------------------------------------------------------
 
 const instructions = readFileSync(join(HERE, "lessons-prompt.md"), "utf8");
+const compactInstructions = readFileSync(join(HERE, "lessons-compact-prompt.md"), "utf8");
 
 // The CLI to run. Tests point CC_LESSONS_CLAUDE_BIN at a script that fakes
 // it. On Windows an npm install leaves only a `claude.cmd` shim, which
@@ -325,14 +358,14 @@ const CLAUDE = resolveClaude();
 // CLAUDE.md, no saved transcript. The prompt goes on stdin, never argv: a
 // digest of MAX_CHARS is far past the ~32 KB Windows command-line limit.
 // CLAUDECODE is inherited from the session that spawned this worker and the
-// CLI refuses to start while it is set.
-function runClaude(prompt) {
+// CLI refuses to start while it is set. Returns the model's text.
+function runClaude(prompt, model) {
   const env = { ...process.env, CC_LESSONS_CHILD: "1" };
   delete env.CLAUDECODE;
   const args = [
     ...CLAUDE.prefix,
     "-p",
-    "--model", MODEL,
+    "--model", model,
     "--tools", "",
     "--output-format", "json",
     "--no-session-persistence",
@@ -370,14 +403,14 @@ function runClaude(prompt) {
   if (typeof res.result !== "string" || !res.result.trim()) {
     throw new Error("claude returned an empty result");
   }
-  return parseLessons(res.result);
+  return res.result;
 }
 
 // The model was told to print a bare array. Tolerate fences and prose: try
 // each "[" against each "]" (nearest to the ends first) and accept the first
-// array that is empty or holds lesson objects, so brackets inside the prose
+// array that is empty or passes `looksRight`, so brackets inside the prose
 // do not hide or replace the real array.
-function parseLessons(text) {
+function parseArray(text, looksRight) {
   const s = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   const tryParse = (str) => {
     try {
@@ -387,9 +420,9 @@ function parseLessons(text) {
       return null;
     }
   };
-  const looksRight = (arr) => arr.length === 0 || arr.some((x) => x && typeof x === "object" && "lesson" in x);
+  const accept = (arr) => arr.length === 0 || looksRight(arr);
   const direct = tryParse(s);
-  if (direct && looksRight(direct)) return direct;
+  if (direct && accept(direct)) return direct;
 
   const starts = [];
   for (let i = s.indexOf("["); i !== -1 && starts.length < 20; i = s.indexOf("[", i + 1)) starts.push(i);
@@ -399,11 +432,17 @@ function parseLessons(text) {
     for (const b of ends) {
       if (b <= a) continue;
       const arr = tryParse(s.slice(a, b + 1));
-      if (arr && looksRight(arr)) return arr;
+      if (arr && accept(arr)) return arr;
     }
   }
   if (direct) return direct; // an array of something else; the caller keeps nothing from it
   throw new Error("no JSON array in model output");
+}
+
+const hasLessonObjects = (arr) => arr.some((x) => x && typeof x === "object" && "lesson" in x);
+
+function parseLessons(text) {
+  return parseArray(text, hasLessonObjects);
 }
 
 // --- scope and content guards -------------------------------------------
@@ -426,28 +465,75 @@ function privateTerms() {
   }
 }
 
-function demoteReason(text, projectRoot) {
+// A directory's name, when it is long enough to be a real signal. Short
+// names (src, app, api) would demote unrelated lessons.
+function nameOf(dir) {
+  const name = dir ? L.projectName(dir) : "";
+  return name.length >= 4 ? name : null;
+}
+
+// Absolute paths in one lesson.
+const PATH_TOKEN_RE = /(?:[A-Za-z]:[\\/][^\s"'`,;)\]]*|\/(?:home|Users)\/[^\s"'`,;)\]]*|\/mnt\/[a-z]\/[^\s"'`,;)\]]*|\\\\[a-z0-9-]+\\[^\s"'`,;)\]]*)/gi;
+
+// True when `text` holds at least one absolute path and every one of them is
+// under the user's home directory. Such a path describes this machine, not a
+// client, so it must not pull a lesson down into one client's file.
+function pathsAllUnderHome(text) {
+  const found = text.match(PATH_TOKEN_RE) ?? [];
+  if (found.length === 0) return false;
+  return found.every((p) => {
+    const candidates = [p, p.replace(/\//g, "\\")];
+    const drive = p.match(/^\/([a-z])\/(.*)$/i);
+    if (drive) candidates.push(`${drive[1]}:\\${drive[2].replace(/\//g, "\\")}`);
+    return candidates.some((c) => {
+      try {
+        return L.isUnder(c, L.HOME);
+      } catch {
+        return false;
+      }
+    });
+  });
+}
+
+// Narrow `scope` when the text betrays a narrower one. Only ever moves a
+// lesson down: global to workspace or project, workspace to project. A
+// workspace lesson with no workspace above the project lands in the project.
+// Returns { scope, demoted } where `demoted` says why, or null.
+function narrowScope(scope, text, root, wsRoot) {
   const lower = text.toLowerCase();
-  const name = projectRoot ? L.projectName(projectRoot) : "";
-  if (name.length >= 4 && lower.includes(name.toLowerCase())) return "mentions the project name";
-  if (HOST_RE.test(text)) return "mentions a hostname";
-  if (PATH_RE.test(text)) return "mentions an absolute path";
-  for (const term of privateTerms()) {
-    if (lower.includes(term.toLowerCase())) return "matches private-terms.txt";
+  const project = nameOf(root);
+  const workspace = nameOf(wsRoot);
+  const privateHit = privateTerms().some((term) => lower.includes(term.toLowerCase()));
+  let demoted = null;
+
+  if (scope === "global") {
+    if (project && L.mentionsName(text, project)) return { scope: "project", demoted: "mentions the project name" };
+    if (privateHit) return { scope: "project", demoted: "matches private-terms.txt" };
+    if (workspace && L.mentionsName(text, workspace)) demoted = "mentions the workspace name";
+    else if (HOST_RE.test(text)) demoted = "mentions a hostname";
+    // A path under the home directory is a fact about this machine and stays
+    // global; any other absolute path may belong to one client.
+    else if (PATH_RE.test(text) && !pathsAllUnderHome(text)) demoted = "mentions an absolute path";
+    if (demoted) scope = "workspace";
   }
-  return null;
+  if (scope === "workspace") {
+    if (project && L.mentionsName(text, project)) return { scope: "project", demoted: "mentions the project name" };
+    if (privateHit) return { scope: "project", demoted: "matches private-terms.txt" };
+    if (!wsRoot) return { scope: "project", demoted: demoted ?? "no workspace above the project" };
+  }
+  return { scope, demoted };
 }
 
 // --- one chunk ----------------------------------------------------------
 
-// Lessons already on file for this project and machine, so the model does
-// not repeat them. Sibling projects are never included.
+// Lessons already on file for this project, its workspace and this machine,
+// so the model does not repeat them. Sibling projects are never included.
 function knownLessons(cwd) {
   const parts = [];
   if (cwd) {
     for (const entry of L.lessonsChain(cwd)) {
       if (!entry.managed) continue;
-      if (entry.origin !== "project" && entry.origin !== "store" && entry.origin !== "global") continue;
+      if (!["project", "workspace", "store", "global"].includes(entry.origin)) continue;
       try {
         parts.push(...L.bulletsOf(L.readText(entry.path)));
       } catch {}
@@ -460,23 +546,43 @@ function knownLessons(cwd) {
   return text;
 }
 
+// Files this run appended to, by canonical path: { path, kind }. Candidates
+// for compaction once the queue is drained, along with the files that apply
+// to the directories this run saw.
+const touched = new Map();
+const seenCwds = new Set();
+
+function appendTo(target, kind, lessons, sid) {
+  try {
+    const n = L.appendLessons(target.path, kind, lessons, today()).length;
+    if (n) {
+      touched.set(L.canonical(target.path), { path: target.path, kind });
+      if (kind !== "global") L.log(`wrote ${n} to ${target.kind} ${target.path} (${target.reason})`);
+    }
+    return n;
+  } catch (err) {
+    L.log(`WARN could not write ${target.path} (${sid}): ${short(err)}`);
+    return 0;
+  }
+}
+
 function mineChunk(job, d) {
   const cwd = job.cwd ? resolve(job.cwd) : null;
   // The project root, not the session cwd: a cwd can be a subdirectory whose
   // name is an ordinary word (hooks, windows, src) and would demote unrelated
   // global lessons.
   const root = cwd ? (L.gitToplevel(cwd) ?? cwd) : null;
+  const wsRoot = root ? L.workspaceRoot(root) : null;
   const prompt = [
     instructions,
     `<project>${root ?? "unknown"}</project>`,
+    `<workspace>${wsRoot ?? "none"}</workspace>`,
     `<known>\n${knownLessons(cwd)}\n</known>`,
     `<transcript>\n${d.digest}\n</transcript>`,
   ].join("\n\n");
 
-  const raw = runClaude(prompt);
-  const date = new Date().toISOString().slice(0, 10);
-  const global = [];
-  const project = [];
+  const raw = parseLessons(runClaude(prompt, MODEL));
+  const buckets = { global: [], workspace: [], project: [] };
   const records = [];
 
   for (const item of raw.slice(0, MAX_LESSONS_PER_CHUNK)) {
@@ -488,14 +594,10 @@ function mineChunk(job, d) {
       L.log(`dropped a lesson that looks like it carries a credential (${job.session_id})`);
       continue;
     }
-    let scope = item.scope === "global" ? "global" : "project";
-    let demoted = null;
-    if (scope === "global") {
-      demoted = demoteReason(text, root);
-      if (demoted) scope = "project";
-    }
-    if (scope === "project" && !cwd) continue; // nowhere to put it
-    (scope === "global" ? global : project).push(text);
+    const asked = L.KINDS.includes(item.scope) ? item.scope : "project";
+    const { scope, demoted } = narrowScope(asked, text, root, wsRoot);
+    if (scope !== "global" && !cwd) continue; // nowhere to put it
+    buckets[scope].push(text);
     records.push({
       lesson: text,
       evidence,
@@ -503,6 +605,7 @@ function mineChunk(job, d) {
       demoted,
       tags: Array.isArray(item.tags) ? item.tags.slice(0, 5).map(String) : [],
       project: root,
+      workspace: wsRoot,
       session: job.session_id,
       event: job.event,
       at: new Date().toISOString(),
@@ -510,22 +613,14 @@ function mineChunk(job, d) {
   }
 
   let written = 0;
-  if (global.length) {
-    try {
-      written += L.appendLessons(L.GLOBAL_FILE, "global", global, date).length;
-    } catch (err) {
-      L.log(`WARN could not write ${L.GLOBAL_FILE}: ${short(err)}`);
-    }
+  if (buckets.global.length) {
+    written += appendTo({ path: L.GLOBAL_FILE, kind: "global", reason: "" }, "global", buckets.global, job.session_id);
   }
-  if (project.length) {
-    const target = L.resolveProjectTarget(cwd);
-    try {
-      const n = L.appendLessons(target.path, "project", project, date).length;
-      written += n;
-      if (n) L.log(`wrote ${n} to ${target.kind} ${target.path} (${target.reason})`);
-    } catch (err) {
-      L.log(`WARN could not write ${target.path}: ${short(err)}`);
-    }
+  if (buckets.workspace.length) {
+    written += appendTo(L.resolveWorkspaceTarget(wsRoot), "workspace", buckets.workspace, job.session_id);
+  }
+  if (buckets.project.length) {
+    written += appendTo(L.resolveProjectTarget(cwd), "project", buckets.project, job.session_id);
   }
   for (const r of records) {
     try {
@@ -546,6 +641,7 @@ async function processJob(job) {
 
   const state = loadState(sid);
   if (state.disabled) return "disabled";
+  if (job.cwd) seenCwds.add(resolve(job.cwd));
   let cursor = await cursorFor(state, path);
   const minTurns = event === "Stop" ? MIN_TURNS : MIN_TURNS_FINAL;
   let chunks = 0;
@@ -770,11 +866,228 @@ async function sweep() {
   }
 }
 
+// --- compaction ---------------------------------------------------------
+
+// Append-only files grow until they no longer fit in a session's context.
+// Instead of clipping them at read time, merge bullets that say the same
+// thing and drop the ones a later bullet made stale. The bullets that were
+// replaced go to compact.jsonl, so a bad merge can be undone by hand.
+
+function compactStamp(path, suffix = "") {
+  return join(L.THROTTLE, `compact-${createHash("sha1").update(L.canonical(path)).digest("hex").slice(0, 12)}${suffix}`);
+}
+
+function stampAge(path, suffix) {
+  try {
+    return Date.now() - statSync(compactStamp(path, suffix)).mtimeMs;
+  } catch {
+    return Infinity;
+  }
+}
+
+const looksLikeCompaction = (arr) =>
+  arr.every((x) => typeof x === "string" || (x && typeof x === "object" && typeof x.lesson === "string"));
+
+// Compact one file. Returns { status: "compacted" | "skipped" | "rejected",
+// reason, before, after, charsBefore, charsAfter }. `force` ignores the size
+// threshold and both waiting windows; the model call itself is never skipped.
+function compactFile(path, { force = false, kind } = {}) {
+  if (!existsSync(path)) return { status: "skipped", reason: "no such file" };
+  const text = L.readText(path);
+  if (!text.trimStart().startsWith(L.MARKER)) return { status: "skipped", reason: "not written by the hook" };
+  if (!force && text.length < COMPACT_AT) return { status: "skipped", reason: `under ${COMPACT_AT} characters` };
+  if (!force && stampAge(path) < COMPACT_INTERVAL_MS) return { status: "skipped", reason: "compacted less than a day ago" };
+  // A file the model could not shrink is not worth one call a day. Wait a
+  // week: by then new lessons have arrived and there is something to merge.
+  if (!force && stampAge(path, ".rejected") < REJECT_INTERVAL_MS) {
+    return { status: "skipped", reason: "a compaction was refused less than a week ago" };
+  }
+  const { header, bullets, strays } = splitForCompaction(text);
+  if (bullets.length < 2) return { status: "skipped", reason: "fewer than two lessons" };
+  // Rewriting the file would drop anything that is not a bullet, and the
+  // archive would not record it. Hand the file to /lessons tidy instead.
+  if (strays.length) {
+    return { status: "skipped", reason: `${strays.length} line(s) in the list are not lessons, cannot rewrite the file` };
+  }
+
+  try {
+    writeFileSync(compactStamp(path), new Date().toISOString(), "utf8");
+  } catch {}
+
+  const scope = kind ?? kindOfFile(path, header);
+  const prompt = [
+    compactInstructions,
+    `<scope>${scope}</scope>`,
+    `<lessons-file>\n${bullets.map((b) => `- [${b.date}] ${b.lesson}`).join("\n")}\n</lessons-file>`,
+  ].join("\n\n");
+
+  const out = parseArray(runClaude(prompt, COMPACT_MODEL), looksLikeCompaction);
+  const merged = [];
+  for (const item of out) {
+    const lesson = L.normalizeLessonText(typeof item === "string" ? item : item?.lesson).slice(0, 600);
+    if (!lesson) continue;
+    if (SECRET_RE.test(lesson)) continue;
+    const date = typeof item?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date) ? item.date : today();
+    merged.push({ date, lesson });
+  }
+
+  const result = {
+    before: bullets.length,
+    after: merged.length,
+    charsBefore: text.length,
+    charsAfter: L.joinLessons(header, merged, today()).length,
+  };
+  const refuse = (reason) => {
+    try {
+      writeFileSync(compactStamp(path, ".rejected"), new Date().toISOString(), "utf8");
+    } catch {}
+    return { status: "rejected", reason, ...result };
+  };
+  if (merged.length === 0) return refuse("model returned nothing");
+  if (merged.length > bullets.length) return refuse("more lessons than before");
+  if (merged.length < Math.ceil(bullets.length * COMPACT_MIN_KEEP)) {
+    return refuse(`kept only ${merged.length} of ${bullets.length} lessons`);
+  }
+  if (result.charsAfter > text.length) return refuse("the rewrite is longer than the file");
+  const dropped = bullets.length - merged.length;
+  const minDropped = Math.max(1, Math.ceil(bullets.length * COMPACT_MIN_DROP));
+  if (dropped < minDropped && result.charsAfter > text.length * (1 - COMPACT_MIN_GAIN)) {
+    return refuse(`merged only ${dropped} of ${bullets.length} lessons away and barely shrank the file`);
+  }
+  // Counts and size say nothing about whether the facts survived. Every
+  // flag, identifier, error constant and version in the input must still be
+  // there, or the model dropped a lesson instead of merging it.
+  const had = L.factTokens(bullets.map((b) => b.lesson).join("\n"));
+  const kept = L.factTokens(merged.map((b) => b.lesson).join("\n"));
+  const missing = [...had].filter((t) => !kept.has(t));
+  if (had.size && missing.length > Math.floor(had.size * (1 - COMPACT_MIN_FACTS))) {
+    return refuse(`lost ${missing.length} of ${had.size} details, including ${missing.slice(0, 3).map((t) => JSON.stringify(t)).join(", ")}`);
+  }
+
+  // Re-read right before writing: a session's worker may have appended in
+  // the meantime (this worker holds the lock, but the file is shared with
+  // the user's editor). Anything not in the compacted input is kept.
+  const now = L.readText(path);
+  const seen = new Set(bullets.map((b) => b.lesson.toLowerCase()));
+  const nowSplit = L.splitLessons(now);
+  const extra = nowSplit.bullets.filter((b) => !seen.has(b.lesson.toLowerCase()));
+  if (nowSplit.strays.length) return refuse("the file gained lines that are not lessons while the model was running");
+  const final = [...merged, ...extra.map((b) => ({ date: b.date ?? today(), lesson: b.lesson }))];
+  const written = L.joinLessons(header, final, today());
+  L.writeAtomic(path, written);
+  // A file that compacts again is not the one that was refused before.
+  rmSync(compactStamp(path, ".rejected"), { force: true });
+  try {
+    appendFileSync(L.COMPACTIONS, JSON.stringify({
+      at: new Date().toISOString(),
+      path,
+      kind: scope,
+      before: bullets.length,
+      after: final.length,
+      charsBefore: text.length,
+      charsAfter: written.length,
+      replaced: bullets,
+      kept: final,
+    }) + "\n", "utf8");
+  } catch {}
+  return { status: "compacted", reason: "", ...result, after: final.length, charsAfter: written.length };
+}
+
+// Bullets with a date for the prompt; undated ones get today's.
+function splitForCompaction(text) {
+  const { header, bullets, strays } = L.splitLessons(text);
+  return { header, strays, bullets: bullets.map((b) => ({ date: b.date ?? today(), lesson: b.lesson })) };
+}
+
+// The kind of file, used only to tell the model what it is looking at. The
+// caller usually knows; this is the fallback for `--compact <path>`. A
+// workspace root that is itself a repository reads as a project, which is
+// what it is: the same file serves both.
+function kindOfFile(path, header) {
+  if (L.samePath(path, L.GLOBAL_FILE)) return "global";
+  if (/across all\s+projects/i.test(header)) return "global";
+  if (/repositories under this/i.test(header)) return "workspace";
+  if (/sessions in this project/i.test(header)) return "project";
+  // No header we recognise. A file that sits at a repository root is that
+  // repository's; anything else groups several of them.
+  const dir = dirname(resolve(path));
+  const toplevel = L.gitToplevel(dir);
+  return toplevel && L.samePath(toplevel, dir) ? "project" : "workspace";
+}
+
+function describe(path, r) {
+  const size = r.charsBefore != null ? `, ${r.charsBefore} -> ${r.charsAfter} characters` : "";
+  const count = r.before != null ? ` ${r.before} -> ${r.after} lessons` : "";
+  return `${r.status} ${path}:${count}${size}${r.reason ? ` (${r.reason})` : ""}`;
+}
+
+// Everything this run may have to compact: the files it appended to, plus
+// every managed file that applies to a directory it saw. Without the second
+// half a file that stopped receiving lessons would stay oversized forever.
+function compactCandidates() {
+  const out = new Map(touched);
+  for (const cwd of seenCwds) {
+    let projectRoot;
+    let wsRoot;
+    try {
+      projectRoot = L.gitToplevel(cwd) ?? cwd;
+      wsRoot = L.workspaceRoot(projectRoot);
+    } catch {
+      continue;
+    }
+    for (const e of L.lessonsChain(cwd)) {
+      if (!e.managed || e.symlink) continue;
+      const key = L.canonical(e.path);
+      if (out.has(key)) continue;
+      let kind;
+      if (e.origin === "global") kind = "global";
+      else if (e.origin === "workspace") kind = "workspace";
+      else if (e.origin === "project") kind = "project";
+      else if (e.origin === "store") kind = wsRoot && L.samePath(e.path, L.storeFile(wsRoot)) ? "workspace" : "project";
+      else continue; // "local" and "parent" files are nobody's to rewrite
+      out.set(key, { path: e.path, kind });
+    }
+  }
+  return [...out.values()];
+}
+
+function compactAll() {
+  for (const { path, kind } of compactCandidates()) {
+    if (!holdLock()) return;
+    try {
+      const r = compactFile(path, { kind });
+      if (r.status !== "skipped") L.log(`compaction ${describe(path, r)}`);
+    } catch (err) {
+      L.log(`FAIL compaction of ${path}: ${short(err)}`);
+    }
+  }
+}
+
 // --- main ---------------------------------------------------------------
+
+if (compactOnly) {
+  let code = 0;
+  try {
+    const r = compactFile(compactOnly, { force: true });
+    L.log(`compaction ${describe(compactOnly, r)}`);
+    process.stdout.write(describe(compactOnly, r) + "\n");
+  } catch (err) {
+    L.log(`FAIL compaction of ${compactOnly}: ${short(err)}`);
+    process.stdout.write(`failed ${compactOnly}: ${short(err)}\n`);
+    code = 1;
+  } finally {
+    release();
+  }
+  process.exit(code);
+}
+
+// The transcript file is written asynchronously and lags the live session.
+await sleep(STARTUP_DELAY_MS);
 
 try {
   await drain();
   if (holdLock()) await sweep();
+  compactAll();
 } catch (err) {
   L.log(`FAIL worker: ${short(err)}`);
 } finally {

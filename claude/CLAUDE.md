@@ -90,12 +90,18 @@ hard-to-parse prose is not.
 ## Lessons
 
 `LESSONS.md` files hold notes Claude wrote after past sessions. A hook writes
-them; nobody reviews them. Read them before the first task of a session:
+them; nobody reviews them. They live at three levels and a note is filed at
+the lowest level where it is still true: the project (the git repository),
+the workspace (the nearest directory above the repository that groups one
+client's repositories, marked by a `CLAUDE.md`, a `.git`, a
+`*.code-workspace` file or a `LESSONS.md` the hook wrote), and the user.
+Read them before the first task of a session:
 
 1. `LESSONS.md` in the current directory, then in each parent directory up
-   to the filesystem root, nearest first.
+   to the filesystem root, nearest first. The project's and the workspace's
+   files are among these.
 2. `~/.claude/lessons/projects/<slug>/LESSONS.md`, the out-of-tree copy for
-   projects where the in-tree file cannot be used.
+   directories where the in-tree file cannot be used.
 3. `~/.claude/LESSONS.md`, the user-level file.
 
 A SessionStart hook injects the same files as a `<lessons>` block. If that

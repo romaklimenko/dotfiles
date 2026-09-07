@@ -281,16 +281,539 @@ test("lessons-context lists unmanaged files by path only and says when nothing a
   assert.match(runHook("lessons-context.mjs", { cwd: empty }), /No LESSONS\.md applies/);
 });
 
-test("lessons-context clips big files keeping head and tail", () => {
+test("lessons-context clips big files to the header and the newest bullets", () => {
   const repo = initRepo();
   let text = L.header("project");
   for (let i = 0; i < 400; i++) text += `- [2026-01-01] bullet number ${i} ${"y".repeat(40)}\n`;
   writeFileSync(join(repo, "LESSONS.md"), text);
   const out = runHook("lessons-context.mjs", { cwd: repo });
-  assert.match(out, /characters omitted/);
-  assert.match(out, /bullet number 0 /);
+  assert.match(out, /\[\.\.\. \d+ older lessons omitted, open the file for the rest \.\.\.\]/);
+  assert.match(out, /Notes Claude Code wrote after past sessions in this project/, "header kept");
   assert.match(out, /bullet number 399 /);
+  assert.doesNotMatch(out, /bullet number 0 /);
   assert.doesNotMatch(out, /bullet number 200 /);
+  const body = out.slice(out.indexOf("<file"), out.indexOf("</file>"));
+  assert.ok(body.length <= 12 * 1024 + 200, `injected block is ${body.length} chars`);
+  // The newest bullets are contiguous: nothing between the note and the end is missing.
+  const shown = [...out.matchAll(/bullet number (\d+) /g)].map((m) => Number(m[1]));
+  assert.deepEqual(shown, shown.map((_, i) => shown[0] + i));
+});
+
+// --- workspace ------------------------------------------------------------------
+
+// A directory holding several clones, marked the way the user marks one:
+// a CLAUDE.md at the top. Returns { ws, repo } with `repo` a fresh clone
+// inside it.
+function initWorkspace(marker = "CLAUDE.md") {
+  const ws = freshDir("ws");
+  if (marker === ".git") git(ws, "init", "-q");
+  else writeFileSync(join(ws, marker), marker === "CLAUDE.md" ? "# workspace rules\n" : "{}\n");
+  const repo = join(ws, "client-repo");
+  mkdirSync(repo);
+  git(repo, "init", "-q");
+  writeFileSync(join(repo, "README.md"), "# fixture\n");
+  git(repo, "add", "README.md");
+  git(repo, "commit", "-q", "-m", "init");
+  return { ws, repo };
+}
+
+test("workspaceRoot: nearest marked ancestor, none for a plain parent, never home", () => {
+  for (const marker of ["CLAUDE.md", ".git", "team.code-workspace"]) {
+    const { ws, repo } = initWorkspace(marker);
+    assert.equal(L.canonical(L.workspaceRoot(repo)), L.canonical(ws), `marker ${marker}`);
+  }
+  // A managed LESSONS.md the hook wrote earlier is a marker too.
+  const work = freshDir("marked-by-lessons");
+  writeFileSync(join(work, "LESSONS.md"), L.header("workspace"));
+  const inner = join(work, "repo");
+  mkdirSync(inner);
+  git(inner, "init", "-q");
+  assert.equal(L.canonical(L.workspaceRoot(inner)), L.canonical(work));
+  // An unmanaged LESSONS.md is not.
+  writeFileSync(join(work, "LESSONS.md"), "# theirs\n");
+  assert.equal(L.workspaceRoot(inner), null);
+  // Nearest wins when two ancestors qualify.
+  const { ws, repo } = initWorkspace();
+  const nested = join(ws, "group");
+  mkdirSync(nested);
+  writeFileSync(join(nested, "CLAUDE.md"), "# group\n");
+  const deep = join(nested, "deep-repo");
+  mkdirSync(deep);
+  git(deep, "init", "-q");
+  assert.equal(L.canonical(L.workspaceRoot(deep)), L.canonical(nested));
+  assert.equal(L.canonical(L.workspaceRoot(repo)), L.canonical(ws));
+  // A repository with nothing marked above it has no workspace.
+  assert.equal(L.workspaceRoot(initRepo()), null);
+  // The walk continues past a parent that has no marker.
+  const marked = freshDir("marked");
+  writeFileSync(join(marked, "CLAUDE.md"), "# marked\n");
+  const buried = join(marked, "plain", "repo");
+  mkdirSync(buried, { recursive: true });
+  git(buried, "init", "-q");
+  assert.equal(L.canonical(L.workspaceRoot(buried)), L.canonical(marked));
+  assert.equal(L.looksLikeWorkspace(join(marked, "plain")), false);
+  // The home directory never qualifies, marker or not.
+  writeFileSync(join(HOME, "CLAUDE.md"), "# home\n");
+  const underHome = join(HOME, "proj");
+  mkdirSync(underHome);
+  git(underHome, "init", "-q");
+  assert.equal(L.workspaceRoot(underHome), null);
+});
+
+test("resolveWorkspaceTarget: plain directory in place, repository proven ignored, unmanaged file to the store", () => {
+  const plain = initWorkspace("CLAUDE.md");
+  let t = L.resolveWorkspaceTarget(plain.ws);
+  assert.equal(t.kind, "tree");
+  assert.equal(t.reason, "not inside a git repository");
+  assert.equal(L.canonical(t.path), L.canonical(join(plain.ws, "LESSONS.md")));
+
+  const repo = initWorkspace(".git");
+  t = L.resolveWorkspaceTarget(repo.ws);
+  assert.equal(t.kind, "tree");
+  assert.equal(t.reason, "added to .git/info/exclude");
+  assert.match(readFileSync(join(repo.ws, ".git", "info", "exclude"), "utf8"), /^LESSONS\.md$/m);
+
+  // A workspace directory that is a subdirectory of a bigger repository.
+  const outer = initRepo();
+  const sub = join(outer, "clients");
+  mkdirSync(sub);
+  writeFileSync(join(sub, "CLAUDE.md"), "# clients\n");
+  t = L.resolveWorkspaceTarget(sub);
+  assert.equal(t.kind, "tree");
+  assert.equal(t.reason, "added to .git/info/exclude");
+  assert.equal(L.gitIsIgnored(outer, "clients/LESSONS.md"), true);
+
+  writeFileSync(join(plain.ws, "LESSONS.md"), "# theirs\n");
+  t = L.resolveWorkspaceTarget(plain.ws);
+  assert.equal(t.kind, "store");
+  assert.equal(t.reason, "LESSONS.md exists without marker");
+});
+
+test("lessonsChain labels the workspace file and includes its store", () => {
+  const { ws, repo } = initWorkspace();
+  writeFileSync(join(ws, "LESSONS.md"), L.header("workspace") + "- [2026-01-01] workspace fact\n");
+  writeFileSync(join(repo, "LESSONS.md"), L.header("project") + "- [2026-01-01] project fact\n");
+  const wsStore = L.storeFile(ws);
+  mkdirSync(dirname(wsStore), { recursive: true });
+  writeFileSync(wsStore, L.header("workspace") + "- [2026-01-01] workspace store fact\n");
+  writeFileSync(GLOBAL, L.header("global") + "- [2026-01-01] global fact\n");
+  const chain = L.lessonsChain(join(repo));
+  assert.deepEqual(chain.map((e) => e.origin), ["project", "workspace", "store", "global"]);
+  assert.equal(L.canonical(chain[1].path), L.canonical(join(ws, "LESSONS.md")));
+  assert.equal(L.canonical(chain[2].path), L.canonical(wsStore));
+  const out = runHook("lessons-context.mjs", { cwd: repo });
+  assert.match(out, /<file origin="workspace" path="[^"]*LESSONS\.md">\n[\s\S]*workspace fact/);
+  // Seen from the workspace root itself, the same file is the project file.
+  assert.equal(L.lessonsChain(ws)[0].origin, "project");
+});
+
+test("worker: workspace lessons land in the workspace file, demotion moves down one level at a time", () => {
+  const { ws, repo } = initWorkspace();
+  writeFileSync(join(ws, "LESSONS.md"), L.header("workspace") + "- [2026-01-01] Known workspace fact\n");
+  const sid = uuid();
+  const path = join(scratch, `${sid}.jsonl`);
+  writeFileSync(path, transcript(4));
+  const capture = freshDir("capture");
+  enqueue({ session_id: sid, transcript_path: path, cwd: join(repo, "src"), event: "SessionEnd" });
+  mkdirSync(join(repo, "src"));
+  runWorker({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_RESULT: JSON.stringify([
+    { lesson: "The client's pipelines deploy with --force-lock on test only", evidence: "e", scope: "workspace" },
+    { lesson: "The org's warehouse at adb-1.azuredatabricks.net is classic compute", evidence: "e", scope: "global" },
+    { lesson: "client-repo's CI needs tags on every job", evidence: "e", scope: "workspace" },
+  ]) });
+
+  const wsText = readFileSync(join(ws, "LESSONS.md"), "utf8");
+  assert.match(wsText, /--force-lock on test only/);
+  assert.match(wsText, /azuredatabricks\.net/, "global lesson with a hostname is demoted to the workspace, not the project");
+  assert.doesNotMatch(wsText, /CI needs tags/);
+  const projText = readFileSync(join(repo, "LESSONS.md"), "utf8");
+  assert.match(projText, /CI needs tags/, "workspace lesson naming the project is demoted to the project");
+  assert.doesNotMatch(projText, /force-lock|azuredatabricks/);
+  assert.ok(!existsSync(GLOBAL));
+
+  const records = readFileSync(join(LESSONS_ROOT, "log.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(records.map((r) => [r.scope, r.demoted]), [
+    ["workspace", null],
+    ["workspace", "mentions a hostname"],
+    ["project", "mentions the project name"],
+  ]);
+  assert.equal(L.canonical(records[0].workspace), L.canonical(ws));
+
+  const [call] = calls(capture);
+  assert.match(call.prompt, new RegExp(`<workspace>[^<]*${ws.split(/[\\/]/).pop()}</workspace>`));
+  assert.match(call.prompt, /<known>[\s\S]*Known workspace fact[\s\S]*<\/known>/, "workspace bullets are known to the miner");
+  assert.match(readLog(), /wrote 2 to tree .*ws-\d+[\\/]LESSONS\.md \(not inside a git repository\)/);
+  assert.match(readLog(), /wrote 1 to tree .*client-repo[\\/]LESSONS\.md \(added to \.git\/info\/exclude\)/);
+});
+
+test("worker: without a workspace, workspace-scoped lessons stay in the project", () => {
+  const repo = initRepo();
+  const sid = uuid();
+  const path = join(scratch, `${sid}.jsonl`);
+  writeFileSync(path, transcript(4));
+  const capture = freshDir("capture");
+  enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+  runWorker({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_RESULT: JSON.stringify([
+    { lesson: "Sibling repositories share one lock table", evidence: "e", scope: "workspace" },
+    { lesson: "Config lives under C:\\clients\\shared", evidence: "e", scope: "global" },
+  ]) });
+  const projText = readFileSync(join(repo, "LESSONS.md"), "utf8");
+  assert.match(projText, /share one lock table/);
+  assert.match(projText, /clients\\shared/, "a global lesson with a path falls through workspace to project");
+  assert.ok(!existsSync(GLOBAL));
+  const records = readFileSync(join(LESSONS_ROOT, "log.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(records.map((r) => [r.scope, r.demoted]), [
+    ["project", "no workspace above the project"],
+    ["project", "mentions an absolute path"],
+  ]);
+  assert.equal(records[0].workspace, null);
+  assert.match(calls(capture)[0].prompt, /<workspace>none<\/workspace>/);
+});
+
+// --- compaction -----------------------------------------------------------------
+
+// Bullets with no distinctive details in them (no flags, identifiers, error
+// constants, versions or multi-digit numbers), so the fact-retention guard
+// has nothing to check and each other guard can be tested on its own.
+const noteText = (i) => `Note ${String.fromCharCode(97 + (i % 26))}: ${"detail ".repeat(8)}`.trim();
+
+function bigFile(path, kind, n) {
+  let text = L.header(kind);
+  for (let i = 0; i < n; i++) text += `- [2026-01-0${(i % 9) + 1}] ${noteText(i)}\n`;
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+  return text;
+}
+
+function compactResult(n, extra = []) {
+  const arr = [];
+  for (let i = 0; i < n; i++) arr.push({ date: "2026-02-01", lesson: `Merged fact ${i}` });
+  return JSON.stringify([...arr, ...extra]);
+}
+
+test("worker: a file it made big is compacted after the run, replaced bullets are archived", () => {
+  const repo = initRepo();
+  bigFile(join(repo, "LESSONS.md"), "project", 20);
+  const sid = uuid();
+  const path = join(scratch, `${sid}.jsonl`);
+  writeFileSync(path, transcript(4));
+  const capture = freshDir("capture");
+  enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+  runWorker({
+    FAKE_CLAUDE_CAPTURE: capture,
+    FAKE_CLAUDE_RESULT: JSON.stringify([{ lesson: "Fresh project fact", evidence: "e", scope: "project" }]),
+    FAKE_CLAUDE_COMPACT_RESULT: compactResult(10, ["A bare string is accepted too"]),
+    CC_LESSONS_COMPACT_AT_CHARS: "500",
+  });
+
+  const text = readFileSync(join(repo, "LESSONS.md"), "utf8");
+  assert.ok(text.startsWith(L.header("project")), "header kept verbatim");
+  const bullets = L.bulletsOf(text);
+  assert.equal(bullets.length, 11);
+  assert.equal(bullets[0], "Merged fact 0");
+  assert.equal(bullets[10], "A bare string is accepted too");
+  assert.match(text, /^- \[2026-02-01\] Merged fact 0$/m);
+  assert.match(text, new RegExp(`^- \\[${new Date().toISOString().slice(0, 10)}\\] A bare string`, "m"), "undated bullets get today");
+  assert.doesNotMatch(text, /Note d:/);
+
+  const [mine, compact] = calls(capture);
+  assert.match(mine.argv.join(" "), /--model haiku/);
+  assert.match(compact.argv.join(" "), /--model sonnet/);
+  assert.match(compact.prompt, /<scope>project<\/scope>/);
+  assert.match(compact.prompt, /<lessons-file>\n- \[2026-01-01\] Note a:[\s\S]*Fresh project fact\n<\/lessons-file>/);
+  assert.match(compact.prompt, /You are compacting a LESSONS\.md file/);
+
+  const archive = readFileSync(join(LESSONS_ROOT, "compact.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(archive.length, 1);
+  assert.equal(archive[0].before, 21);
+  assert.equal(archive[0].after, 11);
+  assert.equal(archive[0].kind, "project");
+  assert.equal(archive[0].replaced.length, 21);
+  assert.equal(archive[0].replaced[3].lesson, noteText(3));
+  assert.equal(archive[0].charsAfter, readFileSync(join(repo, "LESSONS.md"), "utf8").length);
+  assert.match(readLog(), /compaction compacted .*LESSONS\.md: 21 -> 11 lessons, \d+ -> \d+ characters/);
+
+  // Inside the daily window a second run leaves the file alone even though it is still over the threshold.
+  const sid2 = uuid();
+  const path2 = join(scratch, `${sid2}.jsonl`);
+  writeFileSync(path2, transcript(4));
+  enqueue({ session_id: sid2, transcript_path: path2, cwd: repo, event: "SessionEnd" });
+  runWorker({
+    FAKE_CLAUDE_CAPTURE: capture,
+    FAKE_CLAUDE_RESULT: JSON.stringify([{ lesson: "Another project fact", evidence: "e", scope: "project" }]),
+    FAKE_CLAUDE_COMPACT_RESULT: compactResult(2),
+    CC_LESSONS_COMPACT_AT_CHARS: "100",
+  });
+  assert.equal(calls(capture).length, 3, "one mining call, no compaction");
+  assert.equal(L.bulletsOf(readFileSync(join(repo, "LESSONS.md"), "utf8")).length, 12);
+});
+
+test("worker: a compaction that drops too much, grows the file or returns nothing is refused", () => {
+  // Twenty bullets on file plus the one the mining call adds: 21 go in.
+  const same = (n) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ date: "2026-01-01", lesson: noteText(i) })));
+  const cases = [
+    [compactResult(3), /kept only 3 of 21 lessons/],
+    [compactResult(21, ["one more"]), /more lessons than before/],
+    ["[]", /model returned nothing/],
+    [same(20), /merged only 1 of 21 lessons away and barely shrank the file/],
+    // Same count, more text: a reword that costs context and gains nothing.
+    [JSON.stringify(Array.from({ length: 21 }, (_, i) => ({ date: "2026-01-01", lesson: `${noteText(i)} and then some more words` }))), /the rewrite is longer than the file/],
+    [JSON.stringify([{ date: "2026-01-01", lesson: "token=abcdefghijkl" }, ...Array.from({ length: 9 }, (_, i) => ({ date: "2026-01-01", lesson: `Merged ${i}` }))]), null],
+  ];
+  for (const [result, expected] of cases) {
+    resetHome();
+    const repo = initRepo();
+    bigFile(join(repo, "LESSONS.md"), "project", 20);
+    const sid = uuid();
+    const path = join(scratch, `${sid}.jsonl`);
+    writeFileSync(path, transcript(4));
+    enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+    runWorker({
+      FAKE_CLAUDE_RESULT: JSON.stringify([{ lesson: "Fresh project fact", evidence: "e", scope: "project" }]),
+      FAKE_CLAUDE_COMPACT_RESULT: result,
+      CC_LESSONS_COMPACT_AT_CHARS: "100",
+      CC_LESSONS_COMPACT_HOURS: "0",
+    });
+    const text = readFileSync(join(repo, "LESSONS.md"), "utf8");
+    if (expected) {
+      assert.equal(L.bulletsOf(text).length, 21, `file untouched for ${expected}`);
+      assert.match(text, /Note d:/);
+      assert.match(text, /Fresh project fact/);
+      assert.match(readLog(), new RegExp(`compaction rejected .*\\(${expected.source}\\)`));
+      assert.ok(!existsSync(join(LESSONS_ROOT, "compact.jsonl")));
+    } else {
+      assert.doesNotMatch(text, /token=/, "a credential in the model's output is dropped");
+      assert.equal(L.bulletsOf(text).length, 9);
+      assert.match(readLog(), /compaction compacted .*: 21 -> 9 lessons/);
+    }
+  }
+});
+
+test("worker: compaction covers the files that apply to the run, each with its own scope, and nothing else", () => {
+  const { ws, repo } = initWorkspace();
+  bigFile(GLOBAL, "global", 20);
+  bigFile(join(ws, "LESSONS.md"), "workspace", 20);
+  bigFile(join(repo, "LESSONS.md"), "project", 20);
+  // A sibling project the run never touches.
+  const other = initRepo();
+  bigFile(join(other, "LESSONS.md"), "project", 20);
+  const sid = uuid();
+  const path = join(scratch, `${sid}.jsonl`);
+  writeFileSync(path, transcript(4));
+  const capture = freshDir("capture");
+  enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+  runWorker({
+    FAKE_CLAUDE_CAPTURE: capture,
+    FAKE_CLAUDE_RESULT: JSON.stringify([{ lesson: "Global CLI quirk", evidence: "e", scope: "global" }]),
+    FAKE_CLAUDE_COMPACT_RESULT: compactResult(10),
+    CC_LESSONS_COMPACT_AT_CHARS: "100",
+  });
+
+  const [, ...compactions] = calls(capture);
+  assert.equal(compactions.length, 3, "the global, workspace and project files that apply");
+  const scopes = compactions.map((c) => c.prompt.match(/<scope>(\w+)<\/scope>/)[1]).sort();
+  assert.deepEqual(scopes, ["global", "project", "workspace"]);
+  for (const f of [GLOBAL, join(ws, "LESSONS.md"), join(repo, "LESSONS.md")]) {
+    assert.equal(L.bulletsOf(readFileSync(f, "utf8")).length, 10, f);
+  }
+  assert.equal(L.bulletsOf(readFileSync(join(other, "LESSONS.md"), "utf8")).length, 20, "a project the run never saw is left alone");
+});
+
+test("worker: --compact <path> compacts one file now and reports", () => {
+  const { ws, repo } = initWorkspace();
+  const file = join(ws, "LESSONS.md");
+  bigFile(file, "workspace", 6);
+  const capture = freshDir("capture");
+  const run = (env) => execFileSync(process.execPath, [join(HOOKS, "extract-lessons.mjs"), "--compact", file], {
+    encoding: "utf8", env: { ...ENV, ...env }, stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
+  });
+  let out = run({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_COMPACT_RESULT: compactResult(4) });
+  assert.match(out, /^compacted .*LESSONS\.md: 6 -> 4 lessons, \d+ -> \d+ characters\n$/);
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 4);
+  assert.ok(readFileSync(file, "utf8").startsWith(L.header("workspace")));
+  assert.match(calls(capture)[0].prompt, /<scope>workspace<\/scope>/);
+  assert.equal(readdirSync(QUEUE).length, 0);
+  assert.ok(!existsSync(join(LESSONS_ROOT, "extract.lock")));
+
+  // The header says what a file is, wherever it sits. An out-of-tree store
+  // file for a project is not a workspace file just because its directory
+  // is not a repository root.
+  const store = L.storeFile(freshDir("plain-project"));
+  bigFile(store, "project", 6);
+  const out2 = execFileSync(process.execPath, [join(HOOKS, "extract-lessons.mjs"), "--compact", store], {
+    encoding: "utf8", env: { ...ENV, FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_COMPACT_RESULT: compactResult(4) }, stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
+  });
+  assert.match(out2, /^compacted /);
+  assert.match(calls(capture).at(-1).prompt, /<scope>project<\/scope>/);
+
+  // Forced: size threshold and daily window do not apply, a refusal is reported.
+  out = run({ FAKE_CLAUDE_COMPACT_RESULT: "[]" });
+  assert.match(out, /^rejected .*\(model returned nothing\)\n$/);
+
+  writeFileSync(file, "# theirs\n");
+  assert.match(run({}), /^skipped .*\(not written by the hook\)\n$/);
+  assert.equal(readFileSync(file, "utf8"), "# theirs\n");
+
+  // A file with lines that are not lessons is left for /lessons tidy.
+  bigFile(file, "workspace", 4);
+  appendFileSync(file, "\nA note I wrote by hand.\n");
+  assert.match(run({ FAKE_CLAUDE_COMPACT_RESULT: compactResult(2) }), /^skipped .*\(1 line\(s\) in the list are not lessons/);
+  assert.match(readFileSync(file, "utf8"), /A note I wrote by hand\./);
+
+  // A model failure exits non-zero and says so.
+  bigFile(file, "workspace", 4);
+  try {
+    run({ FAKE_CLAUDE_EXIT: "1" });
+    assert.fail("expected a non-zero exit");
+  } catch (err) {
+    assert.equal(err.status, 1);
+    assert.match(err.stdout, /^failed .*claude exit 1/);
+  }
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 4);
+
+  // With another worker holding the lock, it says so and does nothing.
+  writeFileSync(join(LESSONS_ROOT, "extract.lock"), "999999");
+  assert.match(run({}), /^skipped: another worker holds the lock/);
+  assert.equal(readFileSync(join(LESSONS_ROOT, "extract.lock"), "utf8"), "999999");
+  assert.ok(existsSync(join(repo, ".git")), "the clone inside the workspace was left alone");
+});
+
+test("compaction is refused when the rewrite loses a flag, an identifier or a version", () => {
+  const repo = initRepo();
+  const file = join(repo, "LESSONS.md");
+  const tail = ", which took a whole afternoon of guessing to work out";
+  const facts = [
+    `Pass \`--force-lock\` to the deploy or it hangs${tail}`,
+    `databricks.yml only globs main_jobs${tail}`,
+    `The error is UNRESOLVED_COLUMN and names the dropped column${tail}`,
+    `Runtime 17.3 ships Spark 4, not 3.5.8${tail}`,
+  ];
+  writeFileSync(file, L.header("project") + facts.map((f) => `- [2026-01-01] ${f}\n`).join(""));
+  const run = (result) => {
+    rmSync(join(LESSONS_ROOT, "throttle"), { recursive: true, force: true });
+    return execFileSync(process.execPath, [join(HOOKS, "extract-lessons.mjs"), "--compact", file], {
+      encoding: "utf8", env: { ...ENV, FAKE_CLAUDE_COMPACT_RESULT: JSON.stringify(result) }, stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
+    });
+  };
+
+  // Two bullets merged into vague prose: shorter, fewer, and missing the details.
+  let out = run([{ date: "2026-01-01", lesson: "Deploys need the right flag and the config globs some directories" }, { date: "2026-01-01", lesson: "Check the runtime version and the error message" }]);
+  assert.match(out, /^rejected .*\(lost \d+ of \d+ details, including /);
+  assert.match(out, /"--force-lock"|"databricks\.yml"|"unresolved_column"|"17\.3"/);
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 4, "file untouched");
+
+  // The same merge with every detail carried over is accepted.
+  out = run([
+    { date: "2026-01-01", lesson: "Pass `--force-lock` to the deploy; databricks.yml only globs main_jobs" },
+    { date: "2026-01-01", lesson: "Runtime 17.3 ships Spark 4, not 3.5.8, and reports UNRESOLVED_COLUMN with the dropped column" },
+  ]);
+  assert.match(out, /^compacted /);
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 2);
+});
+
+test("worker: a refused compaction waits a week, and an oversized file it did not write is compacted too", () => {
+  const repo = initRepo();
+  const file = join(repo, "LESSONS.md");
+  bigFile(file, "project", 20);
+  const capture = freshDir("capture");
+  const mine = (n) => {
+    const sid = uuid();
+    const path = join(scratch, `${sid}.jsonl`);
+    writeFileSync(path, transcript(4));
+    enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+    return { sid, path, n };
+  };
+
+  // Nothing is mined, so the file is never appended to: it is a candidate
+  // only because it applies to the directory the job named.
+  mine();
+  runWorker({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_RESULT: "[]", FAKE_CLAUDE_COMPACT_RESULT: "[]", CC_LESSONS_COMPACT_AT_CHARS: "100" });
+  assert.equal(calls(capture).length, 2, "one mining call, one compaction call");
+  assert.match(readLog(), /compaction rejected .*\(model returned nothing\)/);
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 20);
+
+  // A refusal blocks the retry for a week, even with the daily window off.
+  mine();
+  runWorker({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_RESULT: "[]", FAKE_CLAUDE_COMPACT_RESULT: compactResult(8), CC_LESSONS_COMPACT_AT_CHARS: "100", CC_LESSONS_COMPACT_HOURS: "0" });
+  assert.equal(calls(capture).length, 3, "no second compaction call");
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 20);
+
+  // Once the week is up it tries again.
+  mine();
+  runWorker({ FAKE_CLAUDE_CAPTURE: capture, FAKE_CLAUDE_RESULT: "[]", FAKE_CLAUDE_COMPACT_RESULT: compactResult(8), CC_LESSONS_COMPACT_AT_CHARS: "100", CC_LESSONS_COMPACT_HOURS: "0", CC_LESSONS_COMPACT_REJECT_HOURS: "0" });
+  assert.equal(calls(capture).length, 5, "mining and compaction ran again");
+  assert.equal(L.bulletsOf(readFileSync(file, "utf8")).length, 8);
+  assert.deepEqual(
+    readdirSync(join(LESSONS_ROOT, "throttle")).filter((f) => f.endsWith(".rejected")),
+    [],
+    "a success clears the refusal, so the next one is not blocked for a week",
+  );
+});
+
+test("clip keeps the newest lessons by date, in file order", async () => {
+  const C = await import(new URL("../claude/hooks/lessons-context.mjs", import.meta.url));
+  const filler = "z".repeat(300);
+  // Deliberately out of date order, the way a compaction leaves a file.
+  const dated = [
+    ["2026-05-01", "newest but first in the file"],
+    ["2026-01-01", "oldest"],
+    ["2026-04-01", "second newest"],
+  ];
+  let text = L.header("project");
+  for (const [date, lesson] of dated) text += `- [${date}] ${lesson} ${filler}\n`;
+  for (let i = 0; i < 60; i++) text += `- [2026-02-01] middle ${i} ${filler}\n`;
+  assert.ok(text.length > C.PER_FILE);
+
+  const { text: clipped, cut } = C.clip(text);
+  assert.ok(clipped.length <= C.PER_FILE, `clipped to ${clipped.length}`);
+  assert.ok(cut > 0);
+  assert.match(clipped, /newest but first in the file/, "kept by date, not by position");
+  assert.match(clipped, /second newest/);
+  assert.doesNotMatch(clipped, /\] oldest /);
+  assert.match(clipped, new RegExp(`\\[\\.\\.\\. ${cut} older lessons omitted`));
+  // What survives is printed in the order the file has it.
+  const order = [...clipped.matchAll(/^- \[[\d?-]+\] (\S+ ?\S*)/gm)].map((m) => m[1]);
+  assert.equal(order[0], "newest but");
+  assert.equal(order[1], "second newest");
+  // A file under the cap is returned untouched.
+  const small = L.header("project") + "- [2026-01-01] tiny\n";
+  assert.deepEqual(C.clip(small), { text: small, cut: 0 });
+});
+
+test("worker: the workspace name, a private term and a home path each steer the scope", () => {
+  const { ws, repo } = initWorkspace();
+  const wsName = L.projectName(ws);
+  mkdirSync(join(LESSONS_ROOT), { recursive: true });
+  writeFileSync(join(LESSONS_ROOT, "private-terms.txt"), "# one per line\nAcmecorp\n");
+  const sid = uuid();
+  const path = join(scratch, `${sid}.jsonl`);
+  writeFileSync(path, transcript(4));
+  enqueue({ session_id: sid, transcript_path: path, cwd: repo, event: "SessionEnd" });
+  runWorker({ FAKE_CLAUDE_RESULT: JSON.stringify([
+    { lesson: `The ${wsName} tree keeps its bundles in a shared folder`, evidence: "e", scope: "global" },
+    { lesson: "Acmecorp's warehouse rejects single-user clusters", evidence: "e", scope: "global" },
+    { lesson: `Claude Code keeps its settings in ${join(HOME, ".claude", "settings.json")}`, evidence: "e", scope: "global" },
+  ]) });
+
+  const records = readFileSync(join(LESSONS_ROOT, "log.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(records.map((r) => [r.scope, r.demoted]), [
+    ["workspace", "mentions the workspace name"],
+    ["project", "matches private-terms.txt"],
+    ["global", null],
+  ]);
+  assert.match(readFileSync(join(ws, "LESSONS.md"), "utf8"), new RegExp(`The ${wsName} tree`));
+  assert.match(readFileSync(join(repo, "LESSONS.md"), "utf8"), /Acmecorp/);
+  const global = readFileSync(GLOBAL, "utf8");
+  assert.match(global, /Claude Code keeps its settings in/, "a path under the home directory is a fact about this machine");
+  assert.doesNotMatch(global, /Acmecorp/);
+});
+
+test("mentionsName matches a whole word only", () => {
+  assert.ok(L.mentionsName("the home directory", "home"));
+  assert.ok(L.mentionsName("(home)", "home"));
+  assert.ok(!L.mentionsName("the homepage", "home"));
+  assert.ok(!L.mentionsName("chrome", "home"));
+  assert.ok(L.mentionsName("a c++ thing", "c++"), "punctuation in the name is escaped");
 });
 
 test("lessons-context prints a skip block for temp and disabled sessions, nothing for the miner child", () => {
@@ -301,12 +824,26 @@ test("lessons-context prints a skip block for temp and disabled sessions, nothin
 
 test("lessons-context --report lists chain and pipeline", () => {
   writeFileSync(GLOBAL, L.header("global") + "- [2026-01-01] g\n");
-  const out = execFileSync(process.execPath, [join(HOOKS, "lessons-context.mjs"), "--report"], { encoding: "utf8", env: ENV, cwd: scratch });
+  const report = () => execFileSync(process.execPath, [join(HOOKS, "lessons-context.mjs"), "--report"], { encoding: "utf8", env: ENV, cwd: scratch });
+  let out = report();
   assert.match(out, /^Lessons for /);
   assert.match(out, /global\s+.*LESSONS\.md/);
   assert.match(out, /1 lessons/);
   assert.match(out, /Pipeline/);
   assert.match(out, /worker idle/);
+  assert.match(out, /replaced by compaction: .*compact\.jsonl/);
+  assert.doesNotMatch(out, /last compaction:/);
+
+  // An oversized file says how it is shown and how to fix it.
+  let big = L.header("global");
+  for (let i = 0; i < 400; i++) big += `- [2026-01-01] bullet ${i} ${"y".repeat(40)}\n`;
+  writeFileSync(GLOBAL, big);
+  mkdirSync(LESSONS_ROOT, { recursive: true });
+  appendFileSync(join(LESSONS_ROOT, "compact.jsonl"), JSON.stringify({ at: "2026-03-04T05:06:07.000Z", path: GLOBAL, before: 9, after: 4 }) + "\n");
+  out = report();
+  assert.match(out, /over the 12288 character injection cap, only the newest bullets are shown/);
+  assert.match(out, /\/lessons compact <path> does it now/);
+  assert.match(out, /last compaction: 2026-03-04T05:06 .*LESSONS\.md 9 -> 4 lessons/);
 });
 
 // --- enqueue hook -------------------------------------------------------------

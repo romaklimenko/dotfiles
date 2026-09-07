@@ -7,7 +7,7 @@ Each element:
 {
   "lesson":   "imperative, specific, one or two sentences",
   "evidence": "verbatim quote of the error string or the user's correction",
-  "scope":    "project" | "global",
+  "scope":    "project" | "workspace" | "global",
   "tags":     ["short", "tags"]
 }
 
@@ -45,12 +45,20 @@ stated. It is never a description of what the session did.
 
 ## scope
 
-- `global`: true regardless of which client or repository the work happens
-  in. Tooling behaviour, CLI quirks, language and platform facts.
-- `project`: specific to this codebase, client, or environment. Anything
-  naming an internal system, table, pipeline, or client convention.
+Pick the narrowest scope that is still true. Lessons live in files at three
+levels and a lesson filed too high shows up in sessions where it is noise.
 
-When unsure, choose `project`.
+- `project`: true only for the repository named in <project>. Its code,
+  tables, pipelines, CI, conventions, and anything naming them.
+- `workspace`: true for every repository under the directory named in
+  <workspace>, which groups one client's or one organization's repositories.
+  The client's conventions, their Azure DevOps or Databricks setup, tooling
+  and patterns shared across their repositories. Only when <workspace> is
+  not "none"; otherwise use `project`.
+- `global`: true regardless of client or repository. Tooling behaviour, CLI
+  quirks, language and platform facts, how this machine is set up.
+
+When unsure, choose the narrower scope.
 
 ## Never include
 

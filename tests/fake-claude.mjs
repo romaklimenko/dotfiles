@@ -1,10 +1,12 @@
 // Stands in for the `claude` CLI in tests. Records every call, then answers
 // the way `claude -p --output-format json` would.
 //
-// FAKE_CLAUDE_CAPTURE   directory that receives call-<n>.json ({ argv, prompt })
-// FAKE_CLAUDE_RESULT    text to return in `result` (default: three lessons)
-// FAKE_CLAUDE_EXIT      exit with this code after printing FAKE_CLAUDE_STDERR
-// FAKE_CLAUDE_IS_ERROR  answer with is_error: true
+// FAKE_CLAUDE_CAPTURE         directory that receives call-<n>.json ({ argv, prompt })
+// FAKE_CLAUDE_RESULT          text to return in `result` for a mining call (default: three lessons)
+// FAKE_CLAUDE_COMPACT_RESULT  text to return for a compaction call, recognised by
+//                             its <lessons-file> tag (default: an empty array)
+// FAKE_CLAUDE_EXIT            exit with this code after printing FAKE_CLAUDE_STDERR
+// FAKE_CLAUDE_IS_ERROR        answer with is_error: true
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -30,7 +32,10 @@ const defaultLessons = [
   { lesson: "A fourth lesson is over the limit and must be dropped", evidence: "n/a", scope: "project", tags: [] },
 ];
 
-const result = process.env.FAKE_CLAUDE_RESULT ?? JSON.stringify(defaultLessons);
+const compaction = prompt.includes("<lessons-file>");
+const result = compaction
+  ? (process.env.FAKE_CLAUDE_COMPACT_RESULT ?? "[]")
+  : (process.env.FAKE_CLAUDE_RESULT ?? JSON.stringify(defaultLessons));
 const isError = Boolean(process.env.FAKE_CLAUDE_IS_ERROR);
 
 process.stdout.write(JSON.stringify({
