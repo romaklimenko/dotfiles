@@ -288,7 +288,7 @@ test("lessons-context clips big files to the header and the newest bullets", () 
   writeFileSync(join(repo, "LESSONS.md"), text);
   const out = runHook("lessons-context.mjs", { cwd: repo });
   assert.match(out, /\[\.\.\. \d+ older lessons omitted, open the file for the rest \.\.\.\]/);
-  assert.match(out, /Notes Claude Code wrote after past sessions in this project/, "header kept");
+  assert.match(out, /Notes Claude Code and Codex wrote after past sessions in this project/, "header kept");
   assert.match(out, /bullet number 399 /);
   assert.doesNotMatch(out, /bullet number 0 /);
   assert.doesNotMatch(out, /bullet number 200 /);
@@ -318,7 +318,7 @@ function initWorkspace(marker = "CLAUDE.md") {
 }
 
 test("workspaceRoot: nearest marked ancestor, none for a plain parent, never home", () => {
-  for (const marker of ["CLAUDE.md", ".git", "team.code-workspace"]) {
+  for (const marker of ["AGENTS.md", "CLAUDE.md", ".git", "team.code-workspace"]) {
     const { ws, repo } = initWorkspace(marker);
     assert.equal(L.canonical(L.workspaceRoot(repo)), L.canonical(ws), `marker ${marker}`);
   }

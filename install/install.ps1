@@ -172,118 +172,15 @@ Write-Host ""
 # Step 6: Verify installation
 # -----------------------------------------------------------------------------
 
-Write-Info "[6/8] Installing Claude Code configuration..."
+Write-Info "[6/8] Installing Claude Code and Codex configuration..."
 $claudeConfigPath = "$env:USERPROFILE\.claude"
-
-# Create .claude directory if it doesn't exist
-if (-not (Test-Path $claudeConfigPath)) {
-    Write-Info "Creating .claude directory..."
-    New-Item -ItemType Directory -Path $claudeConfigPath -Force | Out-Null
+$codexConfigPath = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { "$env:USERPROFILE\.codex" }
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    throw "Node.js 20 or newer is required to install the shared agent configuration."
 }
-
-# Install settings.json
-$claudeSettingsSource = "$dotfilesPath\claude\settings.json"
-$claudeSettingsTarget = "$claudeConfigPath\settings.json"
-if (Test-Path $claudeSettingsTarget) {
-    if (-not $SkipBackup) {
-        $backupPath = "$claudeSettingsTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Write-Warning "Backing up existing Claude Code settings to:"
-        Write-Warning "  $backupPath"
-        Copy-Item $claudeSettingsTarget $backupPath
-    }
-}
-try {
-    Copy-Item $claudeSettingsSource $claudeSettingsTarget -Force
-    Write-Success "Claude Code settings installed to:"
-    Write-Success "  $claudeSettingsTarget"
-} catch {
-    Write-Warning "Failed to install Claude Code settings: $_"
-}
-
-# Install CLAUDE.md
-$claudeMdSource = "$dotfilesPath\claude\CLAUDE.md"
-$claudeMdTarget = "$claudeConfigPath\CLAUDE.md"
-if (Test-Path $claudeMdTarget) {
-    if (-not $SkipBackup) {
-        $backupPath = "$claudeMdTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Write-Warning "Backing up existing global CLAUDE.md to:"
-        Write-Warning "  $backupPath"
-        Copy-Item $claudeMdTarget $backupPath
-    }
-}
-try {
-    Copy-Item $claudeMdSource $claudeMdTarget -Force
-    Write-Success "Global CLAUDE.md installed to:"
-    Write-Success "  $claudeMdTarget"
-} catch {
-    Write-Warning "Failed to install global CLAUDE.md: $_"
-}
-
-# Install commands directory
-$claudeCommandsSource = "$dotfilesPath\claude\commands"
-$claudeCommandsTarget = "$claudeConfigPath\commands"
-if ((Test-Path $claudeCommandsTarget) -and -not (Get-Item $claudeCommandsTarget).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
-    if (-not $SkipBackup) {
-        $backupPath = "$claudeCommandsTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Write-Warning "Backing up existing Claude Code commands to:"
-        Write-Warning "  $backupPath"
-        Move-Item $claudeCommandsTarget $backupPath
-    } else {
-        Remove-Item $claudeCommandsTarget -Recurse -Force
-    }
-}
-try {
-    if (Test-Path $claudeCommandsTarget) {
-        Remove-LinkOrDirectory $claudeCommandsTarget
-    }
-    New-Item -ItemType SymbolicLink -Path $claudeCommandsTarget -Target $claudeCommandsSource -Force | Out-Null
-    Write-Success "Claude Code commands symlinked to:"
-    Write-Success "  $claudeCommandsTarget"
-} catch {
-    Write-Warning "Failed to create symlink for Claude Code commands: $_"
-    Write-Warning "Falling back to copy..."
-    try {
-        Remove-LinkOrDirectory $claudeCommandsTarget
-        Copy-Item $claudeCommandsSource $claudeCommandsTarget -Recurse -Force
-        Write-Success "Claude Code commands copied to:"
-        Write-Success "  $claudeCommandsTarget"
-    } catch {
-        Write-Warning "Failed to copy Claude Code commands: $_"
-    }
-}
-
-# Install hooks directory
-$claudeHooksSource = "$dotfilesPath\claude\hooks"
-$claudeHooksTarget = "$claudeConfigPath\hooks"
-if ((Test-Path $claudeHooksTarget) -and -not (Get-Item $claudeHooksTarget).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
-    if (-not $SkipBackup) {
-        $backupPath = "$claudeHooksTarget.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-        Write-Warning "Backing up existing Claude Code hooks to:"
-        Write-Warning "  $backupPath"
-        Move-Item $claudeHooksTarget $backupPath
-    } else {
-        Remove-Item $claudeHooksTarget -Recurse -Force
-    }
-}
-try {
-    if (Test-Path $claudeHooksTarget) {
-        Remove-LinkOrDirectory $claudeHooksTarget
-    }
-    New-Item -ItemType SymbolicLink -Path $claudeHooksTarget -Target $claudeHooksSource -Force | Out-Null
-    Write-Success "Claude Code hooks symlinked to:"
-    Write-Success "  $claudeHooksTarget"
-} catch {
-    Write-Warning "Failed to create symlink for Claude Code hooks: $_"
-    Write-Warning "Falling back to copy..."
-    try {
-        Remove-LinkOrDirectory $claudeHooksTarget
-        Copy-Item $claudeHooksSource $claudeHooksTarget -Recurse -Force
-        Write-Success "Claude Code hooks copied to:"
-        Write-Success "  $claudeHooksTarget"
-    } catch {
-        Write-Warning "Failed to copy Claude Code hooks: $_"
-    }
-}
+# Agent sync always backs up changed managed files and retains unrelated settings.
+& node "$dotfilesPath\scripts\sync-agent-config.mjs" --repo $dotfilesPath --home $env:USERPROFILE
+if ($LASTEXITCODE -ne 0) { throw "Shared agent configuration installation failed." }
 
 # Install global git ignore. Git reads ~/.config/git/ignore when
 # core.excludesFile is unset. It keeps LESSONS.md, written by the Claude Code
@@ -315,7 +212,7 @@ if ($gitExcludesFile) {
     }
 }
 
-Write-Success "Claude Code configuration installed"
+Write-Success "Claude Code and Codex configuration installed"
 Write-Host ""
 
 # -----------------------------------------------------------------------------
@@ -335,6 +232,14 @@ if (-not (Test-Path "$dotfilesPath\nvim")) {
 
 if (-not (Test-Path "$claudeConfigPath\settings.json")) {
     $issues += "Claude Code settings not found at $claudeConfigPath\settings.json"
+}
+
+if (-not (Test-Path "$claudeConfigPath\AGENTS.md")) {
+    $issues += "Shared Claude instructions not found at $claudeConfigPath\AGENTS.md"
+}
+
+if (-not (Test-Path "$codexConfigPath\AGENTS.md")) {
+    $issues += "Shared Codex instructions not found at $codexConfigPath\AGENTS.md"
 }
 
 if (-not (Test-Path "$claudeConfigPath\commands")) {

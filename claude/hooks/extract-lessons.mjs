@@ -10,7 +10,7 @@
 
 import {
   mkdirSync, existsSync, readFileSync, appendFileSync, readdirSync, rmSync,
-  renameSync, statSync, openSync, writeSync, closeSync, writeFileSync,
+  renameSync, statSync, writeFileSync,
   createReadStream, utimesSync,
 } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
@@ -18,6 +18,8 @@ import { createHash } from "node:crypto";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as L from "./lessons-lib.mjs";
+import { acquireLock, ownsLock, holdLock, release } from "./lessons-lock.mjs";
+import { SECRET_RE, narrowScope } from "./lessons-policy.mjs";
 
 const MODEL = process.env.CC_LESSONS_MODEL || "haiku";
 // Merging notes without losing facts is harder than mining them, and runs
@@ -75,52 +77,6 @@ for (const d of [L.ROOT, L.QUEUE, L.STATE, L.FAILED, L.THROTTLE]) mkdirSync(d, {
 
 // `wx` makes creation atomic. A stale lock is removed once and creation is
 // retried; the pid check in holdLock() settles any remaining race.
-function acquireLock() {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const fd = openSync(L.LOCK, "wx");
-      writeSync(fd, String(process.pid));
-      closeSync(fd);
-      return true;
-    } catch (err) {
-      if (err.code !== "EEXIST") return false;
-      try {
-        if (Date.now() - statSync(L.LOCK).mtimeMs < L.LOCK_STALE_MS) return false;
-        rmSync(L.LOCK, { force: true });
-      } catch {
-        return false;
-      }
-    }
-  }
-  return false;
-}
-
-function ownsLock() {
-  try {
-    return readFileSync(L.LOCK, "utf8").trim() === String(process.pid);
-  } catch {
-    return false;
-  }
-}
-
-// Re-stamp the lock so a long run is not mistaken for a dead one. Returns
-// false if another worker took the lock over; yield rather than fight.
-function holdLock() {
-  if (!ownsLock()) return false;
-  try {
-    writeFileSync(L.LOCK, String(process.pid), "utf8");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function release() {
-  try {
-    if (ownsLock()) rmSync(L.LOCK, { force: true });
-  } catch {}
-}
-
 const compactArg = process.argv.indexOf("--compact");
 const compactOnly = compactArg !== -1 ? resolve(process.argv[compactArg + 1] ?? "") : null;
 
@@ -449,81 +405,6 @@ function parseLessons(text) {
 
 // The prompt asks for scope; this is the deterministic backstop. Anything
 // that smells like one machine, one client or one project stays local.
-const HOST_RE = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:net|com|dk|io|org|cloud|dev|azure|local|internal)\b/i;
-const PATH_RE = /(?:[A-Za-z]:[\\/]|\/home\/|\/Users\/|\/mnt\/[a-z]\/|\\\\[a-z0-9-]+\\)/i;
-// Lessons are never allowed to carry credentials, whatever the scope.
-const SECRET_RE = /(?:AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|(?:password|passwd|secret|token|api[_-]?key|connectionstring)\s*[:=]\s*["']?[^\s"']{6,})/i;
-
-function privateTerms() {
-  try {
-    return L.readText(L.PRIVATE_TERMS)
-      .split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s && !s.startsWith("#"));
-  } catch {
-    return [];
-  }
-}
-
-// A directory's name, when it is long enough to be a real signal. Short
-// names (src, app, api) would demote unrelated lessons.
-function nameOf(dir) {
-  const name = dir ? L.projectName(dir) : "";
-  return name.length >= 4 ? name : null;
-}
-
-// Absolute paths in one lesson.
-const PATH_TOKEN_RE = /(?:[A-Za-z]:[\\/][^\s"'`,;)\]]*|\/(?:home|Users)\/[^\s"'`,;)\]]*|\/mnt\/[a-z]\/[^\s"'`,;)\]]*|\\\\[a-z0-9-]+\\[^\s"'`,;)\]]*)/gi;
-
-// True when `text` holds at least one absolute path and every one of them is
-// under the user's home directory. Such a path describes this machine, not a
-// client, so it must not pull a lesson down into one client's file.
-function pathsAllUnderHome(text) {
-  const found = text.match(PATH_TOKEN_RE) ?? [];
-  if (found.length === 0) return false;
-  return found.every((p) => {
-    const candidates = [p, p.replace(/\//g, "\\")];
-    const drive = p.match(/^\/([a-z])\/(.*)$/i);
-    if (drive) candidates.push(`${drive[1]}:\\${drive[2].replace(/\//g, "\\")}`);
-    return candidates.some((c) => {
-      try {
-        return L.isUnder(c, L.HOME);
-      } catch {
-        return false;
-      }
-    });
-  });
-}
-
-// Narrow `scope` when the text betrays a narrower one. Only ever moves a
-// lesson down: global to workspace or project, workspace to project. A
-// workspace lesson with no workspace above the project lands in the project.
-// Returns { scope, demoted } where `demoted` says why, or null.
-function narrowScope(scope, text, root, wsRoot) {
-  const lower = text.toLowerCase();
-  const project = nameOf(root);
-  const workspace = nameOf(wsRoot);
-  const privateHit = privateTerms().some((term) => lower.includes(term.toLowerCase()));
-  let demoted = null;
-
-  if (scope === "global") {
-    if (project && L.mentionsName(text, project)) return { scope: "project", demoted: "mentions the project name" };
-    if (privateHit) return { scope: "project", demoted: "matches private-terms.txt" };
-    if (workspace && L.mentionsName(text, workspace)) demoted = "mentions the workspace name";
-    else if (HOST_RE.test(text)) demoted = "mentions a hostname";
-    // A path under the home directory is a fact about this machine and stays
-    // global; any other absolute path may belong to one client.
-    else if (PATH_RE.test(text) && !pathsAllUnderHome(text)) demoted = "mentions an absolute path";
-    if (demoted) scope = "workspace";
-  }
-  if (scope === "workspace") {
-    if (project && L.mentionsName(text, project)) return { scope: "project", demoted: "mentions the project name" };
-    if (privateHit) return { scope: "project", demoted: "matches private-terms.txt" };
-    if (!wsRoot) return { scope: "project", demoted: demoted ?? "no workspace above the project" };
-  }
-  return { scope, demoted };
-}
-
 // --- one chunk ----------------------------------------------------------
 
 // Lessons already on file for this project, its workspace and this machine,

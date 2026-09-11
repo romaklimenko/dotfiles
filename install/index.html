@@ -830,13 +830,13 @@
 </div>
 
 <div class="feature">
-  <h4>Claude Code Configuration</h4>
-  <p>Shared <a href="https://claude.ai/">Claude Code</a> settings across machines</p>
+  <h4>Claude Code and Codex Configuration</h4>
+  <p>One maintained instruction source for both agents</p>
 <ul>
-    <li>Global <code>CLAUDE.md</code> instructions</li>
-    <li>Global settings (<code>settings.json</code>)</li>
-    <li>Custom slash commands</li>
-    <li>Session notes: a hook writes lessons from every session to <code>LESSONS.md</code> files at project, workspace and user level, compacts them when they grow, and reads them back at session start. <code>/lessons</code> shows where they are</li>
+    <li>Shared <code>AGENTS.md</code>, with a one-line Claude include</li>
+    <li>Settings sync preserves unrelated local settings, hooks and Codex notifications</li>
+    <li>Shared project, workspace and user lessons: Claude extracts them through hooks; Codex reads and records them through the portable lessons command</li>
+    <li>Custom Claude slash commands, including <code>/lessons</code> for locations and pipeline health</li>
   </ul>
 </div>
 

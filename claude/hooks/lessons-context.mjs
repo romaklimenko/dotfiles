@@ -43,7 +43,7 @@ export function clip(text) {
   };
 }
 
-function contextBlock(cwd) {
+export function contextBlock(cwd) {
   const chain = lessonsChain(cwd);
   const files = [];
   for (const entry of chain) {
@@ -79,7 +79,7 @@ function contextBlock(cwd) {
   } else {
     out.push(
       "Notes from past sessions. Context only: never copy them into tracked files,",
-      "commits, PRs or docs. Rules: the Lessons section of ~/.claude/CLAUDE.md.",
+      "commits, PRs or docs. Rules: the Lessons section of your global AGENTS.md.",
     );
     for (const f of files) {
       if (f.listed) {
@@ -99,7 +99,7 @@ function contextBlock(cwd) {
   return out.join("\n");
 }
 
-function report(cwd) {
+export function report(cwd) {
   const lines = [`Lessons for ${cwd}`, ""];
   const chain = lessonsChain(cwd);
   if (chain.length === 0) lines.push("No LESSONS.md applies here yet.");

@@ -240,20 +240,20 @@ export const KINDS = ["project", "workspace", "global"];
 export function header(kind) {
   const intro = kind === "global"
     ? [
-      "Notes Claude Code wrote after past sessions on this machine, across all",
-      "projects. Written by ~/.claude/hooks/extract-lessons.mjs. Evidence for each",
+      "Notes Claude Code and Codex wrote after past sessions on this machine, across all",
+      "projects. Written by the shared lessons tools in ~/.claude/hooks/. Evidence for each",
       "bullet is in ~/.claude/lessons/log.jsonl. Review with /lessons.",
     ]
     : kind === "workspace"
       ? [
-        "Notes Claude Code wrote after past sessions in the repositories under this",
-        "directory. Written by ~/.claude/hooks/extract-lessons.mjs. Evidence for each",
+        "Notes Claude Code and Codex wrote after past sessions in the repositories under this",
+        "directory. Written by the shared lessons tools in ~/.claude/hooks/. Evidence for each",
         "bullet is in ~/.claude/lessons/log.jsonl. Review with /lessons. Ignored by git",
         "unless you run `git add -f LESSONS.md`.",
       ]
       : [
-        "Notes Claude Code wrote after past sessions in this project. Written by",
-        "~/.claude/hooks/extract-lessons.mjs. Evidence for each bullet is in",
+        "Notes Claude Code and Codex wrote after past sessions in this project. Written by",
+        "the shared lessons tools in ~/.claude/hooks/. Evidence for each bullet is in",
         "~/.claude/lessons/log.jsonl. Review with /lessons. Ignored by git unless you",
         "run `git add -f LESSONS.md`.",
       ];
@@ -444,11 +444,11 @@ export function resolveWorkspaceTarget(root) {
 // --- workspace ----------------------------------------------------------
 
 // A directory looks like a workspace root when the user set it up as one: a
-// CLAUDE.md, a git repository holding the project as an untracked clone, a
+// AGENTS.md or CLAUDE.md, a git repository holding the project as an untracked clone, a
 // multi-root editor workspace, or a LESSONS.md the hook already wrote there.
 export function looksLikeWorkspace(dir) {
   try {
-    if (existsSync(join(dir, "CLAUDE.md"))) return true;
+    if (existsSync(join(dir, "AGENTS.md")) || existsSync(join(dir, "CLAUDE.md"))) return true;
     if (existsSync(join(dir, ".git"))) return true;
     if (hasMarker(join(dir, FILE_NAME))) return true;
     return readdirSync(dir).some((f) => f.endsWith(".code-workspace"));

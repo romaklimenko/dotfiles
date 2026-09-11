@@ -154,54 +154,15 @@ echo ""
 # Step 6: Set file permissions
 # -----------------------------------------------------------------------------
 
-print_info "[6/9] Installing Claude Code configuration..."
+print_info "[6/9] Installing Claude Code and Codex configuration..."
 CLAUDE_CONFIG_DIR="$HOME/.claude"
-
-# Create .claude directory if it doesn't exist
-mkdir -p "$CLAUDE_CONFIG_DIR"
-
-# Install settings.json
-CLAUDE_SETTINGS_SOURCE="$DOTFILES_DIR/claude/settings.json"
-CLAUDE_SETTINGS_TARGET="$CLAUDE_CONFIG_DIR/settings.json"
-if [ -f "$CLAUDE_SETTINGS_TARGET" ]; then
-    backup_file "$CLAUDE_SETTINGS_TARGET"
-fi
-cp "$CLAUDE_SETTINGS_SOURCE" "$CLAUDE_SETTINGS_TARGET"
-print_success "Claude Code settings installed to:"
-print_success "  $CLAUDE_SETTINGS_TARGET"
-
-# Install CLAUDE.md
-CLAUDE_MD_SOURCE="$DOTFILES_DIR/claude/CLAUDE.md"
-CLAUDE_MD_TARGET="$CLAUDE_CONFIG_DIR/CLAUDE.md"
-if [ -f "$CLAUDE_MD_TARGET" ]; then
-    backup_file "$CLAUDE_MD_TARGET"
-fi
-cp "$CLAUDE_MD_SOURCE" "$CLAUDE_MD_TARGET"
-print_success "Global CLAUDE.md installed to:"
-print_success "  $CLAUDE_MD_TARGET"
-
-# Install commands directory (symlink)
-CLAUDE_COMMANDS_SOURCE="$DOTFILES_DIR/claude/commands"
-CLAUDE_COMMANDS_TARGET="$CLAUDE_CONFIG_DIR/commands"
-if [ -d "$CLAUDE_COMMANDS_TARGET" ] && [ ! -L "$CLAUDE_COMMANDS_TARGET" ]; then
-    backup_file "$CLAUDE_COMMANDS_TARGET"
-fi
-ln -sfn "$CLAUDE_COMMANDS_SOURCE" "$CLAUDE_COMMANDS_TARGET"
-print_success "Claude Code commands symlinked to:"
-print_success "  $CLAUDE_COMMANDS_TARGET"
-
-# Install hooks directory (symlink). The hooks are Node.js scripts.
+CODEX_CONFIG_DIR="${CODEX_HOME:-$HOME/.codex}"
 if ! command -v node &> /dev/null; then
-    print_warning "node was not found. The Claude Code hooks need Node.js 20 or newer to run."
+    print_error "Node.js 20 or newer is required to install the shared agent configuration."
+    exit 1
 fi
-CLAUDE_HOOKS_SOURCE="$DOTFILES_DIR/claude/hooks"
-CLAUDE_HOOKS_TARGET="$CLAUDE_CONFIG_DIR/hooks"
-if [ -d "$CLAUDE_HOOKS_TARGET" ] && [ ! -L "$CLAUDE_HOOKS_TARGET" ]; then
-    backup_file "$CLAUDE_HOOKS_TARGET"
-fi
-ln -sfn "$CLAUDE_HOOKS_SOURCE" "$CLAUDE_HOOKS_TARGET"
-print_success "Claude Code hooks symlinked to:"
-print_success "  $CLAUDE_HOOKS_TARGET"
+# Agent sync backs up changed managed files and retains unrelated settings.
+node "$DOTFILES_DIR/scripts/sync-agent-config.mjs" --repo "$DOTFILES_DIR" --home "$HOME"
 
 # Install global git ignore. Git reads ~/.config/git/ignore when
 # core.excludesFile is unset. It keeps LESSONS.md, written by the Claude Code
@@ -232,7 +193,7 @@ else
     print_success "  $GIT_IGNORE_TARGET"
 fi
 
-print_success "Claude Code configuration installed"
+print_success "Claude Code and Codex configuration installed"
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -262,6 +223,8 @@ ISSUES=()
 [ ! -f "$HOME/.profile" ] && ISSUES+=("~/.profile not found")
 [ ! -d "$NVIM_CONFIG" ] && ISSUES+=("Neovim config not found at $NVIM_CONFIG")
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
+[ ! -f "$CLAUDE_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Claude instructions not found at $CLAUDE_CONFIG_DIR/AGENTS.md")
+[ ! -f "$CODEX_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Codex instructions not found at $CODEX_CONFIG_DIR/AGENTS.md")
 [ ! -d "$CLAUDE_CONFIG_DIR/commands" ] && ISSUES+=("Claude Code commands not found at $CLAUDE_CONFIG_DIR/commands")
 [ ! -d "$CLAUDE_CONFIG_DIR/hooks" ] && ISSUES+=("Claude Code hooks not found at $CLAUDE_CONFIG_DIR/hooks")
 [ -z "$GIT_EXCLUDES_FILE" ] && [ ! -f "$GIT_IGNORE_TARGET" ] && ISSUES+=("Global git ignore not found at $GIT_IGNORE_TARGET")

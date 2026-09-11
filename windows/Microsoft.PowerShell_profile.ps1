@@ -94,11 +94,8 @@ function Link-OrCopyDirectory($source, $target) {
 function dotsync {
     $dotfilesPath = $env:DOTFILES_HOME
     Copy-Item "$dotfilesPath\windows\Microsoft.PowerShell_profile.ps1" $PROFILE -Force
-    $claudeConfigPath = "$env:USERPROFILE\.claude"
-    Copy-Item "$dotfilesPath\claude\settings.json" "$claudeConfigPath\settings.json" -Force
-    Copy-Item "$dotfilesPath\claude\CLAUDE.md" "$claudeConfigPath\CLAUDE.md" -Force
-    Link-OrCopyDirectory "$dotfilesPath\claude\commands" "$claudeConfigPath\commands"
-    Link-OrCopyDirectory "$dotfilesPath\claude\hooks" "$claudeConfigPath\hooks"
+    & node "$dotfilesPath\scripts\sync-agent-config.mjs" --repo $dotfilesPath --home $env:USERPROFILE
+    if ($LASTEXITCODE -ne 0) { throw "Shared agent configuration sync failed." }
     # Global git ignore keeps LESSONS.md out of every repository by default.
     # Existing content is kept; only missing patterns are appended.
     $gitExcludesFile = git config --global --get core.excludesFile 2>$null

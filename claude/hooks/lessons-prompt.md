@@ -38,7 +38,7 @@ stated. It is never a description of what the session did.
 - Anything about code the session itself wrote or fixed. A bug the session
   fixed is not a lesson, unless it exposes a rule about the environment that
   still holds after the fix.
-- Anything already obvious from the repository's README, CLAUDE.md, or config.
+- Anything already obvious from the repository's README, AGENTS.md, CLAUDE.md, or config.
 - Restatements of what the session accomplished. This is not a summary.
 - Preferences the user stated once in passing without correcting anything.
 - Anything you are inferring rather than observing.
