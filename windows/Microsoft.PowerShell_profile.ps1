@@ -17,6 +17,7 @@ Set-Alias -Name ll -Value Get-ChildItem
 Set-Alias -Name la -Value Get-ChildItem
 
 # Editor
+$env:EDITOR = "vim"
 if (Get-Command nvim -ErrorAction SilentlyContinue) {
     Set-Alias -Name vim -Value nvim
     Set-Alias -Name vi -Value nvim

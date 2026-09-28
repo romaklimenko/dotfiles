@@ -303,6 +303,7 @@ The Windows PowerShell profile includes:
 
 <!-- sync:powershell-reference:start -->
 - **Personal roots:** `$env:DEV_HOME` is `C:\home` and `$env:DOTFILES_HOME` is `C:\home\dotfiles`. `$env:HOME` is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile
+- **Editor:** `$env:EDITOR` is `vim`, so git and other tools that read it open Vim
 - **Aliases:**
   - `ll`, `la` - List files
   - `vim`, `vi` - Opens Neovim (if installed)
