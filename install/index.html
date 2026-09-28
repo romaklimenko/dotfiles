@@ -859,7 +859,7 @@
 
 <h3>Editor</h3>
 <ul>
-    <li><code>$env:EDITOR</code> is <code>vim</code>, so git and other tools that read it open Vim</li>
+    <li><code>$env:EDITOR</code> is <code>vim</code>. In PowerShell <code>vim</code> is an alias for Neovim. Tools that spawn the editor directly, such as hunk, resolve <code>vim</code> to <code>windows/bin/vim.cmd</code>, a shim installed to <code>C:\home\.local\bin</code> that runs Neovim. When hunk launches it inside a herdr pane, the shim opens Neovim in a new herdr pane and waits for it, because hunk's suspended terminal never forwards keystrokes on Windows. Git still finds Vim from Git for Windows first</li>
 </ul>
 
 <h3>Aliases</h3>

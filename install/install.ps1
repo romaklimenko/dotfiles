@@ -134,6 +134,21 @@ try {
     Write-Error "Failed to install PowerShell profile: $_"
     exit 1
 }
+
+# Editor shim: "vim" runs Neovim for tools that spawn the editor directly
+$shimDir = "C:\home\.local\bin"
+try {
+    New-Item -ItemType Directory -Path $shimDir -Force | Out-Null
+    Copy-Item "$dotfilesPath\windows\bin\*" $shimDir -Force
+    Write-Success "Editor shim installed to:"
+    Write-Success "  $shimDir"
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if (($userPath -split ";") -notcontains $shimDir) {
+        Write-Warning "$shimDir is not on the user PATH; add it so 'vim' resolves outside PowerShell"
+    }
+} catch {
+    Write-Warning "Failed to install editor shim: $_"
+}
 Write-Host ""
 
 # -----------------------------------------------------------------------------

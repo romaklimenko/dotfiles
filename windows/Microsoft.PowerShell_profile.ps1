@@ -95,6 +95,9 @@ function Link-OrCopyDirectory($source, $target) {
 function dotsync {
     $dotfilesPath = $env:DOTFILES_HOME
     Copy-Item "$dotfilesPath\windows\Microsoft.PowerShell_profile.ps1" $PROFILE -Force
+    # Editor shim: "vim" runs Neovim for tools that spawn the editor directly.
+    New-Item -ItemType Directory -Path "$env:DEV_HOME\.local\bin" -Force | Out-Null
+    Copy-Item "$dotfilesPath\windows\bin\*" "$env:DEV_HOME\.local\bin" -Force
     & node "$dotfilesPath\scripts\sync-agent-config.mjs" --repo $dotfilesPath --home $env:USERPROFILE
     if ($LASTEXITCODE -ne 0) { throw "Shared agent configuration sync failed." }
     # Global git ignore keeps LESSONS.md out of every repository by default.

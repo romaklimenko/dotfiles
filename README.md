@@ -156,7 +156,8 @@ dotfiles/
 │   ├── install.sh    # Linux/macOS installer
 │   └── index.html    # Landing page
 ├── windows/          # Windows-specific configurations
-│   └── Microsoft.PowerShell_profile.ps1
+│   ├── Microsoft.PowerShell_profile.ps1
+│   └── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
 ├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
 │   ├── .bash_aliases
@@ -303,7 +304,7 @@ The Windows PowerShell profile includes:
 
 <!-- sync:powershell-reference:start -->
 - **Personal roots:** `$env:DEV_HOME` is `C:\home` and `$env:DOTFILES_HOME` is `C:\home\dotfiles`. `$env:HOME` is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile
-- **Editor:** `$env:EDITOR` is `vim`, so git and other tools that read it open Vim
+- **Editor:** `$env:EDITOR` is `vim`. In PowerShell `vim` is an alias for Neovim. Tools that spawn the editor directly, such as hunk, resolve `vim` to `windows/bin/vim.cmd`, a shim installed to `C:\home\.local\bin` that runs Neovim. When hunk launches it inside a herdr pane, the shim opens Neovim in a new herdr pane and waits for it, because hunk's suspended terminal never forwards keystrokes on Windows. Git still finds Vim from Git for Windows first
 - **Aliases:**
   - `ll`, `la` - List files
   - `vim`, `vi` - Opens Neovim (if installed)
