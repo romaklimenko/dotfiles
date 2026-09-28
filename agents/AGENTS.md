@@ -90,12 +90,40 @@ hard-to-parse prose is not.
 
 ## Workspace guidance
 
-Before starting work, load applicable project guidance and any outer workspace
-`AGENTS.md` not already in context. Codex can start discovery at an independent
-clone's Git root and miss the directory grouping the client's repositories.
-The lessons context command below lists the outer workspace first. Read its
-instructions, then apply the closer project's instructions on conflicts.
-For a workspace that only has `CLAUDE.md`, read it and follow its includes.
+A session usually starts in one git repository. That repository may be a
+sub-repo: a clone that sits inside a workspace, a directory above it that
+groups several repositories, often as a VS Code multi-root workspace. Before
+starting work, check whether the parent directory, or the one above it, holds
+any of these: an `AGENTS.md` or `CLAUDE.md`, a `*.code-workspace` file, a
+`.git` directory, or a `LESSONS.md`. Any of them means the session is in a
+sub-repo. Do this check explicitly, because Codex can start discovery at the
+clone's Git root and never see the grouping directory. The lessons context
+command below lists the outer workspace first.
+
+When the session is in a sub-repo:
+
+- Read the workspace's `AGENTS.md` first. If the workspace only has
+  `CLAUDE.md`, read that and follow its includes. Then read the repository's
+  own instructions. On a conflict the repository's file wins, unless the
+  workspace file names a rule that holds in every repository.
+- The sibling directories are separate repositories, each with its own
+  branches, remote and pull requests. The `folders` list in the
+  `*.code-workspace` file names them. Search them for prior art and shared
+  conventions, and read their instruction files when the task touches them.
+- Git commands act on the current repository only. Never stage, commit or
+  push from the workspace root or inside a sibling during this session. If the
+  task needs a change in a sibling repository, say so and treat it as a
+  separate change with its own branch and pull request. The workspace file may
+  say how the branches and work items are linked.
+- The workspace root may be its own git repository that deliberately leaves
+  the sub-repos untracked. Its status listing the current repository as
+  untracked is normal, not something to fix.
+- Workspace-level files such as notes, todo lists and checklists describe more
+  than one repository. Read the ones the workspace file points to. Paths in
+  them are relative to the workspace root, not to the repository.
+- Diff review tools such as hunk see only the repository the session started
+  in. One session therefore covers one repository. A task that spans several
+  repositories is split into one session and one change per repository.
 
 ## Lessons
 
