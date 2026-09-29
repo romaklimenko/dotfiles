@@ -366,8 +366,38 @@ Both full installers and PowerShell `dotsync` call
 manual-install command above. The sync merges managed Claude lesson hooks,
 retains unrelated settings/hooks and local commands, and backs up changed
 managed files. Identical repeated syncs do not rewrite files. It does not edit
-Codex `config.toml`, authentication, plugins, or `notify`. `--codex-home` can
+Codex `config.toml`, authentication, or `notify`. `--codex-home` can
 select a different Codex home explicitly.
+
+On Windows, sync also repairs the three known Bash-only Databricks plugin hook
+commands in the installed Codex cache. It adds `commandWindows` overrides that
+run `python "%PLUGIN_ROOT%/hooks/<script>.py"` through Codex's Windows command
+shell. Python must be on PATH. The original commands and existing Windows
+overrides are preserved. Changed files receive backups. Run `dotsync` again
+after a plugin update if the new version still needs the repair. Other plugins
+and unfamiliar upstream commands are left alone.
+
+After a repair, open `/hooks` in Codex and review the changed Databricks hooks.
+Codex skips changed hooks until you trust their new definitions. Sync never
+changes hook trust records. [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+
+The Windows PowerShell profile configures PSReadLine only when console output
+is interactive. Redirected agent commands do not enable history predictions.
+
+### Windows Codex daemon workaround
+
+The optional PowerShell `codex-local` function adds `--no-daemon` to avoid the shared daemon
+path while [Codex issue #48074](https://github.com/openai/codex/issues/48074)
+is unresolved. This is a workaround for reported flashing terminal windows,
+not a confirmed upstream fix. Normal `codex` commands keep their default
+behavior. Existing daemon sessions and other clients keep running.
+
+Reload the profile with `pp` or open a new PowerShell window, then start Codex
+with `codex-local`. Resume a saved conversation with `codex-local resume --last`.
+This mode does not support `codex agents`, `codex queue`, or `--remote`.
+Keep the CLI open while work runs. Use normal `codex` when shared-session
+control is needed. The function does not apply to applications that launch
+Codex directly.
 
 Codex loads global AGENTS instructions in fresh sessions. A nonempty
 `AGENTS.override.md` can supersede them. Project discovery normally starts at

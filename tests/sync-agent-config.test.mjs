@@ -158,3 +158,60 @@ test("CLI honors CODEX_HOME and explicit --codex-home wins", (t) => {
   execFileSync(process.execPath, [...args, "--codex-home", explicitTarget], options);
   assert.equal(existsSync(join(explicitTarget, "AGENTS.md")), true);
 });
+
+function databricksHooks(f, version = "0.2.22") {
+  const file = join(f.codexHome, "plugins", "cache", "databricks-agent-skills", "databricks", version, "hooks", "hooks.json");
+  const scripts = { SessionStart: "databricks-context.py", UserPromptSubmit: "databricks-router.py", PostToolUse: "databricks-auth-helper.py" };
+  const hooks = Object.fromEntries(Object.entries(scripts).map(([event, name]) => {
+    const path = `"\${PLUGIN_ROOT:-\${CLAUDE_PLUGIN_ROOT}}/hooks/${name}"`;
+    return [event, [{ hooks: [{ type: "command", command: `python3 ${path} || python ${path} || true` }] }]];
+  }));
+  put(file, `${JSON.stringify({ hooks }, null, 2)}\n`.replace(/\n/g, "\r\n"));
+  return file;
+}
+
+test("Windows sync repairs all Databricks hooks, backs up originals and preserves trust settings", (t) => {
+  const f = fixture(t);
+  f.options.platform = "win32";
+  const file = databricksHooks(f);
+  const before = readFileSync(file);
+  const config = join(f.codexHome, "config.toml");
+  const configText = 'notify = ["local-notify"]\n[hooks.state.example]\ntrusted_hash = "keep"\n';
+  put(config, configText);
+  const result = f.run();
+  const hooks = JSON.parse(readFileSync(file, "utf8")).hooks;
+  assert.equal(hooks.SessionStart[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-context.py"');
+  assert.equal(hooks.UserPromptSubmit[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-router.py"');
+  assert.equal(hooks.PostToolUse[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-auth-helper.py"');
+  assert.equal(hooks.SessionStart[0].hooks[0].command, JSON.parse(before).hooks.SessionStart[0].hooks[0].command);
+  assert.deepEqual(result.repairedHooks, [file]);
+  assert.deepEqual(readFileSync(result.backups[0]), before);
+  assert.equal(readFileSync(config, "utf8"), configText);
+  assert.doesNotMatch(readFileSync(file, "utf8"), /(?<!\r)\n/);
+  assert.deepEqual(f.run().changed, []);
+  const nextVersion = databricksHooks(f, "0.2.23");
+  assert.deepEqual(f.run().repairedHooks, [nextVersion]);
+});
+
+test("Windows sync keeps custom overrides and unfamiliar upstream hook commands", (t) => {
+  const f = fixture(t);
+  f.options.platform = "win32";
+  const file = databricksHooks(f);
+  const value = JSON.parse(readFileSync(file, "utf8"));
+  value.hooks.SessionStart[0].hooks[0].commandWindows = "custom-windows-hook";
+  value.hooks.UserPromptSubmit[0].hooks[0].command_windows = "custom-alias-hook";
+  value.hooks.PostToolUse[0].hooks[0].command += " --upstream-change";
+  put(file, value);
+  const before = readFileSync(file);
+  assert.deepEqual(f.run().repairedHooks, []);
+  assert.deepEqual(readFileSync(file), before);
+});
+
+test("non-Windows sync leaves plugin hooks unchanged", (t) => {
+  const f = fixture(t);
+  f.options.platform = "linux";
+  const file = databricksHooks(f);
+  const before = readFileSync(file);
+  assert.deepEqual(f.run().repairedHooks, []);
+  assert.deepEqual(readFileSync(file), before);
+});

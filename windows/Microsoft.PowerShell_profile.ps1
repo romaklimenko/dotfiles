@@ -65,6 +65,16 @@ function dj { databricks jobs $args }
 function dc { databricks clusters $args }
 function dfs { databricks fs $args }
 
+# Opt out of the shared daemon when diagnosing flashing consoles on Windows.
+function codex-local {
+    $cli = Get-Command codex -CommandType Application,ExternalScript -ErrorAction Stop | Select-Object -First 1
+    if ($args -contains '--no-daemon') {
+        & $cli.Source @args
+    } else {
+        & $cli.Source --no-daemon @args
+    }
+}
+
 # Profile management
 function pp { . $PROFILE }
 
@@ -199,7 +209,7 @@ function explore {
 # -----------------------------------------------------------------------------
 
 # PSReadLine configuration for better command line editing
-if (Get-Module -ListAvailable -Name PSReadLine) {
+if (-not [Console]::IsOutputRedirected -and $Host.Name -eq 'ConsoleHost' -and (Get-Module -ListAvailable -Name PSReadLine)) {
     Import-Module PSReadLine
     Set-PSReadLineOption -EditMode Windows
     Set-PSReadLineOption -PredictionSource History
