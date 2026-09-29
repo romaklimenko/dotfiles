@@ -10,6 +10,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
+  - herdr config that opens PowerShell 7 in new panes
 
 - **Bash/Zsh Configuration:** Linux shell setup with:
   - Enhanced aliases
@@ -75,7 +76,14 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install shared agent configuration and the global git ignore (Node.js 20+):
+5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads:
+```powershell
+New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
+Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
+herdr server reload-config
+```
+
+6. Install shared agent configuration and the global git ignore (Node.js 20+):
 ```powershell
 node .\scripts\sync-agent-config.mjs --repo . --home $env:USERPROFILE
 New-Item -ItemType Directory -Path "$env:USERPROFILE/.config/git" -Force
@@ -87,7 +95,7 @@ foreach ($pattern in Get-Content .\git\ignore) {
 }
 ```
 
-6. Reload profile:
+7. Reload profile:
 ```powershell
 . $PROFILE
 ```
@@ -157,7 +165,9 @@ dotfiles/
 │   └── index.html    # Landing page
 ├── windows/          # Windows-specific configurations
 │   ├── Microsoft.PowerShell_profile.ps1
-│   └── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
+│   ├── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
+│   └── herdr/
+│       └── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
 ├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
 │   ├── .bash_aliases
@@ -290,6 +300,15 @@ chmod +x install.sh
 Creating symbolic links on Windows requires either:
 - Administrator privileges, or
 - Developer Mode enabled (Settings → Update & Security → For developers)
+
+### Windows: herdr panes miss the profile aliases
+
+herdr opens Windows PowerShell 5.1 by default. Its profile lives under `Documents\WindowsPowerShell`, which this setup never installs to, so `gs`, `dots`, `vim` and the other profile shortcuts are missing. The installer copies `windows/herdr/config.toml` to `%APPDATA%\herdr\config.toml`, which sets:
+```toml
+[terminal]
+default_shell = "pwsh"
+```
+If the installer did not run, copy the file yourself and run `herdr server reload-config`. Panes that are already open keep their old shell.
 
 ### WSL: File Permissions
 

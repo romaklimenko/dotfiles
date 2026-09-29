@@ -1,0 +1,30 @@
+# herdr configuration. Installed to %APPDATA%\herdr\config.toml by
+# install/install.ps1. Reload a running server with:
+#   herdr server reload-config
+# Print every available setting with: herdr --default-config
+
+onboarding = false
+
+[terminal]
+# New panes open PowerShell 7 so the dotfiles profile loads. herdr falls back
+# to Windows PowerShell 5.1, whose profile this setup never installs.
+default_shell = "pwsh"
+
+[keys]
+# Prefix key (default ctrl+b). Windows Terminal remaps ctrl+ø to F12, because
+# ctrl+ø yields no character on the Danish layout and herdr cannot see it.
+prefix = "f12"
+
+[ui]
+status_indicators = "symbols"
+
+[ui.toast]
+delivery = "herdr"
+
+# Show the Claude Code session title (from the terminal title) in the agent sidebar.
+[ui.sidebar.agents.rows_by_agent]
+claude = [
+  ["state_icon", "machine", "workspace", "tab"],
+  ["terminal_title_stripped"],
+  ["agent"],
+]

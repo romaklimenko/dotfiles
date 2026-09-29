@@ -149,6 +149,38 @@ try {
 } catch {
     Write-Warning "Failed to install editor shim: $_"
 }
+
+# herdr config: new panes open PowerShell 7, so the profile above loads.
+$herdrConfigSource = "$dotfilesPath\windows\herdr\config.toml"
+$herdrConfigPath = "$env:APPDATA\herdr\config.toml"
+if (Get-Command herdr -ErrorAction SilentlyContinue) {
+    try {
+        New-Item -ItemType Directory -Path (Split-Path $herdrConfigPath) -Force | Out-Null
+        $herdrChanged = -not (Test-Path $herdrConfigPath) -or
+            (Get-FileHash $herdrConfigPath).Hash -ne (Get-FileHash $herdrConfigSource).Hash
+        if ($herdrChanged) {
+            if ((Test-Path $herdrConfigPath) -and -not $SkipBackup) {
+                $backupPath = "$herdrConfigPath.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                Write-Warning "Backing up existing herdr config to:"
+                Write-Warning "  $backupPath"
+                Copy-Item $herdrConfigPath $backupPath
+            }
+            Copy-Item $herdrConfigSource $herdrConfigPath -Force
+            # Reload only applies when a server is running. A failure here is
+            # expected otherwise, so its exit code is deliberately ignored.
+            $previousPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            & herdr server reload-config *> $null
+            $ErrorActionPreference = $previousPreference
+        }
+        Write-Success "herdr config installed to:"
+        Write-Success "  $herdrConfigPath"
+    } catch {
+        Write-Warning "Failed to install herdr config: $_"
+    }
+} else {
+    Write-Info "herdr not found; skipping herdr config"
+}
 Write-Host ""
 
 # -----------------------------------------------------------------------------
@@ -267,6 +299,10 @@ if (-not (Test-Path "$claudeConfigPath\hooks")) {
 
 if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
     $issues += "Global git ignore not found at $gitIgnoreTarget"
+}
+
+if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrConfigPath)) {
+    $issues += "herdr config not found at $herdrConfigPath"
 }
 
 if ($issues.Count -eq 0) {
