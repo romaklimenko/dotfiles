@@ -17,6 +17,15 @@ default_shell = "pwsh"
 # sequence ESC[24~. It lives in Windows Terminal settings.json, not here.
 prefix = "f12"
 
+# prefix+d reviews the workspace's working tree in hunk. The temporary pane
+# inherits the workspace directory, reloads the diff as files change, and
+# closes when hunk exits. On Windows herdr runs the command through cmd.exe,
+# which finds hunk.cmd in the npm global directory.
+[[keys.command]]
+key = "prefix+d"
+type = "pane"
+command = "hunk diff --watch"
+
 [ui]
 status_indicators = "symbols"
 

@@ -10,7 +10,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
-  - herdr config that opens PowerShell 7 in new panes
+  - herdr config that opens PowerShell 7 in new panes and reviews the working tree in hunk on `prefix+d`
 
 - **Bash/Zsh Configuration:** Linux shell setup with:
   - Enhanced aliases
@@ -27,6 +27,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Settings sync preserves unrelated local settings, hooks and Codex notifications
   - Shared project, workspace and user lessons: Claude extracts them through hooks; Codex reads and records them through the portable lessons command
   - Custom Claude slash commands, including `/lessons` for locations and pipeline health
+  - hunk's bundled review skill linked for Claude Code, so it can annotate a live hunk diff
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
   - Landing page with light and dark themes, matching the design of [klimenko.dk](https://klimenko.dk)
@@ -76,7 +77,7 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads:
+5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, and binds `prefix+d` to `hunk diff --watch`:
 ```powershell
 New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
 Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
@@ -93,6 +94,10 @@ foreach ($pattern in Get-Content .\git\ignore) {
         Add-Content -LiteralPath $globalIgnore -Value $pattern
     }
 }
+```
+If hunk is installed, link its bundled review skill for Claude Code:
+```powershell
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\hunk-review" -Target (Split-Path (hunk skill path hunk-review))
 ```
 
 7. Reload profile:
@@ -314,6 +319,12 @@ If the installer did not run, copy the file yourself and run `herdr server reloa
 
 The herdr prefix is F12, set in `windows/herdr/config.toml`. Ctrl plus a punctuation key such as `'` yields no character on the Danish layout, so herdr cannot bind it directly. Windows Terminal therefore binds Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits the F12 escape sequence `\u001b[24~`. That binding lives in Windows Terminal's `settings.json`, not in this repository, so add it again on a new machine.
 
+### Windows: review diffs with hunk inside herdr
+
+`windows/herdr/config.toml` binds `prefix+d` to `hunk diff --watch` in a temporary pane. The pane opens in the workspace's working directory, reloads the diff as files change, and closes when hunk exits. herdr runs the command through `cmd.exe`, which finds `hunk.cmd` in the npm global directory, so install hunk with `npm install -g hunkdiff`.
+
+hunk ships a `hunk-review` skill. It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands. The installer links it to `~/.claude/skills/hunk-review` as a junction, so it follows hunk updates without another sync. A typical layout is hunk in one pane and Claude Code in the next: ask Claude to review the diff and its notes appear in the hunk pane.
+
 ### WSL: File Permissions
 
 If you encounter file permission issues in WSL, ensure your files have correct permissions:
@@ -516,6 +527,7 @@ Existing Claude behavior is retained:
   - Escape hatches: `CC_LESSONS_DISABLE=1` skips a session (the sweep honours it too), `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_COMPACT_MODEL` (default `sonnet`), `CC_LESSONS_COMPACT_AT_CHARS` (default `10240`), `CC_LESSONS_COMPACT_HOURS` (default `24`), `CC_LESSONS_COMPACT_REJECT_HOURS` (default `168`), `CC_LESSONS_MIN_TURNS` (default `6`, for `Stop`), `CC_LESSONS_MIN_TURNS_FINAL` (default `3`, for `SessionEnd`, `PreCompact` and the sweep), `CC_LESSONS_STOP_MINUTES` (default `30`)
   - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
   - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline and portable writer/install tests against isolated fixtures and a fake `claude`
+- **Skills:** The Windows installer links hunk's bundled `hunk-review` skill to `~/.claude/skills/hunk-review` when hunk is installed. See "Windows: review diffs with hunk inside herdr"
 - **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
   - Check which you have with `Get-Item ~/.claude/hooks | Select-Object LinkType`

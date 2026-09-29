@@ -259,6 +259,38 @@ if ($gitExcludesFile) {
     }
 }
 
+# hunk review skill: Claude Code drives a live hunk session through it. hunk
+# ships the skill, so a junction keeps it current across hunk updates.
+$hunkSkillPath = "$claudeConfigPath\skills\hunk-review"
+if (Get-Command hunk -ErrorAction SilentlyContinue) {
+    try {
+        $hunkSkillFile = & hunk skill path hunk-review | Select-Object -Last 1
+        $hunkSkillSource = Split-Path $hunkSkillFile -Parent
+        if (-not (Test-Path "$hunkSkillSource\SKILL.md")) {
+            throw "hunk skill path returned '$hunkSkillFile'"
+        }
+        New-Item -ItemType Directory -Path (Split-Path $hunkSkillPath) -Force | Out-Null
+        if (Test-Path $hunkSkillPath) {
+            $existing = Get-Item $hunkSkillPath -Force
+            if ($existing.Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint) -or $SkipBackup) {
+                Remove-LinkOrDirectory $hunkSkillPath
+            } else {
+                $backupPath = "$hunkSkillPath.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                Write-Warning "Backing up existing hunk review skill to:"
+                Write-Warning "  $backupPath"
+                Move-Item $hunkSkillPath $backupPath
+            }
+        }
+        New-Item -ItemType Junction -Path $hunkSkillPath -Target $hunkSkillSource | Out-Null
+        Write-Success "hunk review skill linked to:"
+        Write-Success "  $hunkSkillPath"
+    } catch {
+        Write-Warning "Failed to link hunk review skill: $_"
+    }
+} else {
+    Write-Info "hunk not found; skipping hunk review skill"
+}
+
 Write-Success "Claude Code and Codex configuration installed"
 Write-Host ""
 
@@ -303,6 +335,10 @@ if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrConfigPath)) {
     $issues += "herdr config not found at $herdrConfigPath"
+}
+
+if ((Get-Command hunk -ErrorAction SilentlyContinue) -and -not (Test-Path "$hunkSkillPath\SKILL.md")) {
+    $issues += "hunk review skill not found at $hunkSkillPath"
 }
 
 if ($issues.Count -eq 0) {
