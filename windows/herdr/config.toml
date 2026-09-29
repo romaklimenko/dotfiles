@@ -11,8 +11,10 @@ onboarding = false
 default_shell = "pwsh"
 
 [keys]
-# Prefix key (default ctrl+b). Windows Terminal remaps ctrl+ø to F12, because
-# ctrl+ø yields no character on the Danish layout and herdr cannot see it.
+# Prefix key (default ctrl+b). Windows Terminal remaps Ctrl+' to F12, because
+# Ctrl+' yields no character on the Danish layout and herdr cannot see it.
+# That remap is the keybinding ctrl+vk(0xBF), which sends the F12 escape
+# sequence ESC[24~. It lives in Windows Terminal settings.json, not here.
 prefix = "f12"
 
 [ui]

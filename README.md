@@ -310,6 +310,10 @@ default_shell = "pwsh"
 ```
 If the installer did not run, copy the file yourself and run `herdr server reload-config`. Panes that are already open keep their old shell.
 
+### Windows: herdr prefix key
+
+The herdr prefix is F12, set in `windows/herdr/config.toml`. Ctrl plus a punctuation key such as `'` yields no character on the Danish layout, so herdr cannot bind it directly. Windows Terminal therefore binds Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits the F12 escape sequence `\u001b[24~`. That binding lives in Windows Terminal's `settings.json`, not in this repository, so add it again on a new machine.
+
 ### WSL: File Permissions
 
 If you encounter file permission issues in WSL, ensure your files have correct permissions:
