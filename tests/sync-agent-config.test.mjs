@@ -180,9 +180,10 @@ test("Windows sync repairs all Databricks hooks, backs up originals and preserve
   put(config, configText);
   const result = f.run();
   const hooks = JSON.parse(readFileSync(file, "utf8")).hooks;
-  assert.equal(hooks.SessionStart[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-context.py"');
-  assert.equal(hooks.UserPromptSubmit[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-router.py"');
-  assert.equal(hooks.PostToolUse[0].hooks[0].commandWindows, 'python "%PLUGIN_ROOT%/hooks/databricks-auth-helper.py"');
+  for (const [event, script] of Object.entries({ SessionStart: "databricks-context.py", UserPromptSubmit: "databricks-router.py", PostToolUse: "databricks-auth-helper.py" })) {
+    assert.ok(hooks[event][0].hooks[0].commandWindows.includes(`'hooks', '${script}'`));
+    assert.match(hooks[event][0].hooks[0].commandWindows, /os\.environ\['PLUGIN_ROOT'\]/);
+  }
   assert.equal(hooks.SessionStart[0].hooks[0].command, JSON.parse(before).hooks.SessionStart[0].hooks[0].command);
   assert.deepEqual(result.repairedHooks, [file]);
   assert.deepEqual(readFileSync(result.backups[0]), before);
@@ -205,6 +206,62 @@ test("Windows sync keeps custom overrides and unfamiliar upstream hook commands"
   const before = readFileSync(file);
   assert.deepEqual(f.run().repairedHooks, []);
   assert.deepEqual(readFileSync(file), before);
+});
+
+test("Windows sync migrates its previous cmd-only hook overrides", (t) => {
+  const f = fixture(t);
+  f.options.platform = "win32";
+  f.run();
+  const file = databricksHooks(f);
+  const value = JSON.parse(readFileSync(file, "utf8"));
+  for (const groups of Object.values(value.hooks)) {
+    const hook = groups[0].hooks[0];
+    const script = hook.command.match(/hooks\/(databricks-[a-z-]+\.py)/)[1];
+    hook.commandWindows = `python "%PLUGIN_ROOT%/hooks/${script}"`;
+  }
+  put(file, value);
+  const before = readFileSync(file);
+  const result = f.run();
+  assert.deepEqual(result.repairedHooks, [file]);
+  assert.deepEqual(readFileSync(result.backups[0]), before);
+  assert.doesNotMatch(readFileSync(file, "utf8"), /%PLUGIN_ROOT%/);
+  assert.deepEqual(f.run().changed, []);
+});
+
+test("Windows hook launchers pass stdin and resolve paths in PowerShell and cmd", { skip: process.platform !== "win32" }, (t) => {
+  const f = fixture(t);
+  const file = databricksHooks(f, "test $plugin & path");
+  f.run();
+  const pluginRoot = dirname(dirname(file));
+  const hooks = JSON.parse(readFileSync(file, "utf8")).hooks;
+  const payload = { prompt: "Preserve input", session_id: "test-session" };
+  const shells = [
+    { executable: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command"] },
+    { executable: "pwsh.exe", args: ["-NoProfile", "-NonInteractive", "-Command"] },
+    { executable: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c"], windowsVerbatimArguments: true },
+  ];
+  for (const [event, groups] of Object.entries(hooks)) {
+    const hook = groups[0].hooks[0];
+    const script = hook.command.match(/hooks\/(databricks-[a-z-]+\.py)/)[1];
+    put(join(pluginRoot, "hooks", script), [
+      "import json, pathlib, sys",
+      "assert __name__ == '__main__'",
+      "print(json.dumps({'script': pathlib.Path(__file__).name, 'input': json.load(sys.stdin)}))",
+      "",
+    ].join("\n"));
+    for (const shell of shells) {
+      const output = execFileSync(shell.executable, [...shell.args, hook.commandWindows], {
+        cwd: f.repo,
+        env: { ...process.env, PLUGIN_ROOT: pluginRoot },
+        input: JSON.stringify(payload),
+        encoding: "utf8",
+        timeout: 15000,
+        windowsHide: true,
+        windowsVerbatimArguments: shell.windowsVerbatimArguments,
+      });
+      assert.deepEqual(JSON.parse(output), { script, input: payload }, `${event} via ${shell.executable}`);
+    }
+  }
 });
 
 test("non-Windows sync leaves plugin hooks unchanged", (t) => {

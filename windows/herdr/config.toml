@@ -32,9 +32,14 @@ status_indicators = "symbols"
 [ui.toast]
 delivery = "herdr"
 
-# Show the Claude Code session title (from the terminal title) in the agent sidebar.
+# Show Claude Code and Codex session titles in the agent sidebar.
 [ui.sidebar.agents.rows_by_agent]
 claude = [
+  ["state_icon", "machine", "workspace", "tab"],
+  ["terminal_title_stripped"],
+  ["agent"],
+]
+codex = [
   ["state_icon", "machine", "workspace", "tab"],
   ["terminal_title_stripped"],
   ["agent"],

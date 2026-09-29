@@ -138,8 +138,8 @@ export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME
     for (const file of sourceFiles(source)) plan(join(target, relative(source, file)), readFileSync(file), userRoot);
   }
 
-  // Codex uses cmd.exe for Windows hooks. Add an override only for the known
-  // Bash commands shipped by Databricks; retain upstream and local overrides.
+  // Resolve plugin paths in Python so Windows hooks work in PowerShell and cmd.
+  // Repair only known Databricks commands and our previous cmd-only overrides.
   const repairedHooks = [];
   if (platform === "win32") {
     const plugin = join(codexRoot, "plugins", "cache", "databricks-agent-skills", "databricks");
@@ -156,13 +156,15 @@ export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME
         if (!Array.isArray(groups)) continue;
         for (const group of groups) {
           for (const hook of group.hooks ?? []) {
-            if (hook.type !== "command" || Object.hasOwn(hook, "commandWindows") || Object.hasOwn(hook, "command_windows")) continue;
+            if (hook.type !== "command" || Object.hasOwn(hook, "command_windows")) continue;
             const script = scripts.find((name) => {
               const path = `"\${PLUGIN_ROOT:-\${CLAUDE_PLUGIN_ROOT}}/hooks/${name}"`;
               return hook.command === `python3 ${path} || python ${path} || true`;
             });
             if (!script) continue;
-            hook.commandWindows = `python "%PLUGIN_ROOT%/hooks/${script}"`;
+            const previousOverride = `python "%PLUGIN_ROOT%/hooks/${script}"`;
+            if (Object.hasOwn(hook, "commandWindows") && hook.commandWindows !== previousOverride) continue;
+            hook.commandWindows = `python -c "import os, runpy; runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'], 'hooks', '${script}'), run_name='__main__')"`;
             modified = true;
           }
         }

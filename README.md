@@ -325,6 +325,10 @@ The herdr prefix is F12, set in `windows/herdr/config.toml`. Ctrl plus a punctua
 
 hunk ships a `hunk-review` skill. It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands. The installer links it to `~/.claude/skills/hunk-review` as a junction, so it follows hunk updates without another sync. A typical layout is hunk in one pane and Claude Code in the next: ask Claude to review the diff and its notes appear in the hunk pane.
 
+### Windows: session names in the herdr sidebar
+
+`windows/herdr/config.toml` shows Claude Code and Codex session names below the workspace and tab. Both agent layouts use `terminal_title_stripped` to display the terminal title without the activity symbol. Copy the config to `%APPDATA%\herdr\config.toml` and run `herdr server reload-config` to apply it to existing panes. See [herdr sidebar configuration](https://herdr.dev/docs/configuration/).
+
 ### WSL: File Permissions
 
 If you encounter file permission issues in WSL, ensure your files have correct permissions:
@@ -405,8 +409,10 @@ select a different Codex home explicitly.
 
 On Windows, sync also repairs the three known Bash-only Databricks plugin hook
 commands in the installed Codex cache. It adds `commandWindows` overrides that
-run `python "%PLUGIN_ROOT%/hooks/<script>.py"` through Codex's Windows command
-shell. Python must be on PATH. The original commands and existing Windows
+resolve `PLUGIN_ROOT` inside Python and run the hook with `runpy`. This works
+in PowerShell and cmd, including paths with spaces or shell metacharacters.
+Python must be on PATH. Sync also replaces its previous `%PLUGIN_ROOT%`
+overrides, which failed in PowerShell. The original commands and custom Windows
 overrides are preserved. Changed files receive backups. Run `dotsync` again
 after a plugin update if the new version still needs the repair. Other plugins
 and unfamiliar upstream commands are left alone.
