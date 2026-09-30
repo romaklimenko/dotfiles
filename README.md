@@ -18,7 +18,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Git shortcuts
   - WSL detection and configuration
 
-- **Neovim Configuration:** Modern Neovim setup (from [romaklimenko/nvim](https://github.com/romaklimenko/nvim))
+- **Neovim Configuration:** VS Code-style editing shortcuts, multicursors, Telescope file tabs, and Git previews with Danish-keyboard alternatives (from [romaklimenko/nvim](https://github.com/romaklimenko/nvim))
   - Integrated as git submodule
   - Shared across Windows and Linux
 
@@ -229,6 +229,19 @@ git pull
 ```
 
 ### Update Neovim Configuration
+
+The Neovim submodule includes Ctrl+F for file search, Ctrl+D for multiple
+selections, Ctrl+Z for undo, and Ctrl+W for closing tabs. Telescope opens file
+results in tabs with Enter. Use F4 for project search, F6 for Git changes,
+F7 for all matching selections, and F8/Shift+F8 to switch tabs when Windows
+Terminal captures Ctrl+Shift or Ctrl+Tab shortcuts. Press Space in normal mode
+to see the shortcut menu. See the [Neovim shortcut guide](https://github.com/romaklimenko/nvim#everyday-shortcuts)
+for the complete mappings and editing steps.
+
+The standard Neovim configuration link points to this submodule, so source
+changes are already local. Restart Neovim after changes and install missing
+plugins with `nvim --headless "+Lazy! install" +qa`. Plugin versions are pinned
+in the submodule's `lazy-lock.json`.
 
 ```bash
 # Update submodule to latest commit
