@@ -330,7 +330,9 @@ If the installer did not run, copy the file yourself and run `herdr server reloa
 
 ### Windows: herdr prefix key
 
-The herdr prefix is F12, set in `windows/herdr/config.toml`. Ctrl plus a punctuation key such as `'` yields no character on the Danish layout, so herdr cannot bind it directly. Windows Terminal therefore binds Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits the F12 escape sequence `\u001b[24~`. That binding lives in Windows Terminal's `settings.json`, not in this repository, so add it again on a new machine.
+The herdr prefix is Ctrl+Space, set in `windows/herdr/config.toml`. Windows Terminal 1.1 and later pass it through unchanged, so no remap is needed. Inside herdr panes Ctrl+Space no longer reaches the shell, so PSReadLine's `MenuComplete` on Ctrl+Space is unavailable there. The PowerShell profile binds `MenuComplete` to Tab, so nothing is lost. herdr 0.9.1 stable accepts a single key for `prefix`; the array form shown in the preview docs is rejected with `invalid type: sequence, expected a string`.
+
+Earlier the prefix was F12, reached through a Windows Terminal binding of Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits `\u001b[24~`, because Ctrl plus a punctuation key yields no character on the Danish layout. That binding lives in Windows Terminal's `settings.json`, not in this repository. It is no longer needed and can be removed.
 
 ### Windows: review diffs with hunk inside herdr
 

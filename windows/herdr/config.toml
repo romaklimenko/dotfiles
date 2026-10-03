@@ -11,11 +11,15 @@ onboarding = false
 default_shell = "pwsh"
 
 [keys]
-# Prefix key (default ctrl+b). Windows Terminal remaps Ctrl+' to F12, because
-# Ctrl+' yields no character on the Danish layout and herdr cannot see it.
-# That remap is the keybinding ctrl+vk(0xBF), which sends the F12 escape
-# sequence ESC[24~. It lives in Windows Terminal settings.json, not here.
-prefix = "f12"
+# Prefix key (default ctrl+b). Ctrl+Space: thumb on Space, no stretch to a
+# punctuation key. Windows Terminal passes it through unchanged. Inside herdr
+# panes Ctrl+Space no longer reaches the shell, so PSReadLine's MenuComplete
+# on Ctrl+Space is gone; the profile keeps MenuComplete on Tab.
+# herdr 0.9.1 stable accepts one key here; the array form from the preview
+# docs fails with "invalid type: sequence, expected a string". The old
+# Windows Terminal remap of Ctrl+' to F12 (ctrl+vk(0xBF) in settings.json)
+# is unused now and can be removed.
+prefix = "ctrl+space"
 
 # prefix+d reviews the workspace's working tree in hunk. The temporary pane
 # inherits the workspace directory, reloads the diff as files change, and
