@@ -10,7 +10,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
-  - herdr config that opens PowerShell 7 in new panes and reviews the working tree in hunk on `prefix+d`
+  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, and toggles a Neovim sidebar on `prefix+e`
 
 - **Bash/Zsh Configuration:** Linux shell setup with:
   - Enhanced aliases
@@ -77,8 +77,9 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, and binds `prefix+d` to `hunk diff --watch`:
+5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, and binds `prefix+e` and `prefix+o` to the herdr-nvim plugin:
 ```powershell
+herdr plugin install ChmaraX/herdr-nvim
 New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
 Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
 herdr server reload-config
@@ -340,6 +341,29 @@ Earlier the prefix was F12, reached through a Windows Terminal binding of Ctrl+'
 
 hunk ships a `hunk-review` skill. It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands. The installer links it to `~/.claude/skills/hunk-review` as a junction, so it follows hunk updates without another sync. A typical layout is hunk in one pane and Claude Code in the next: ask Claude to review the diff and its notes appear in the hunk pane.
 
+### Windows: Neovim sidebar inside herdr
+
+The [herdr-nvim](https://github.com/ChmaraX/herdr-nvim) plugin adds a full-height Neovim pane to any herdr tab, plus a file picker and code comments that go to the agent. The Windows installer runs `herdr plugin install ChmaraX/herdr-nvim` when herdr is present and the plugin is missing. herdr binds no keys for plugins, so `windows/herdr/config.toml` binds two `plugin_action` commands:
+
+| Key | Action |
+| --- | --- |
+| `prefix+e` | Toggle the Neovim sidebar. Each tab keeps its own Neovim, and buffers survive the toggle. Closing the tab stops it. |
+| `prefix+o` | Open the file picker. Without a query it lists the files the agent touched this session, newest first. Typing fuzzy-searches the whole repository. Enter opens the file in the sidebar at the right line. |
+
+Both keys replace herdr defaults: `prefix+e` was `edit_scrollback` and `prefix+o` was `open_notification_target`. Free alternatives on herdr 0.9.1 are `prefix+f`, `prefix+i`, `prefix+m`, `prefix+u` and `prefix+a`. Ctrl+click on a `path/file.ext:12` reference in agent output also opens the file in the sidebar.
+
+The sidebar runs this repository's Neovim config, because `%LOCALAPPDATA%\nvim` links to `nvim/`. The plugin injects its own Lua into the sidebar, so these commands work there without a plugin manager entry. The leader key is Space:
+
+| Keys | Command | Action |
+| --- | --- | --- |
+| `Space a c` | `:Herdr comment` | Comment the current line or visual selection |
+| `Space a l` | `:Herdr list` | List comments. Enter edits, `d` deletes |
+| `Space a s` | `:Herdr send` | Paste all comments into the agent's input |
+| `Space a S` | `:Herdr submit` | Send all comments to the agent and submit |
+| `Space a i` | `:Herdr ref` | Insert a `path:12-20` reference at the agent's cursor |
+
+Comments live in memory only and are cleared after a successful send. The prompt includes each comment's file and line, the repository and the branch. The plugin binary is not on `PATH`. To check the setup from inside a herdr session, run `herdr-nvim.exe doctor --with-agent claude` from `%APPDATA%\herdr\plugins\github\chmarax.herdr-nvim-*\bin`.
+
 ### Windows: session names in the herdr sidebar
 
 `windows/herdr/config.toml` shows Claude Code and Codex session names below the workspace and tab. Both agent layouts use `terminal_title_stripped` to display the terminal title without the activity symbol. Copy the config to `%APPDATA%\herdr\config.toml` and run `herdr server reload-config` to apply it to existing panes. See [herdr sidebar configuration](https://herdr.dev/docs/configuration/).
@@ -549,6 +573,7 @@ Existing Claude behavior is retained:
   - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
   - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline and portable writer/install tests against isolated fixtures and a fake `claude`
 - **Skills:** The Windows installer links hunk's bundled `hunk-review` skill to `~/.claude/skills/hunk-review` when hunk is installed. See "Windows: review diffs with hunk inside herdr"
+- **herdr plugins:** The Windows installer installs the herdr-nvim plugin when herdr is present. See "Windows: Neovim sidebar inside herdr"
 - **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
   - Check which you have with `Get-Item ~/.claude/hooks | Select-Object LinkType`

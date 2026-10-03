@@ -181,6 +181,30 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
 } else {
     Write-Info "herdr not found; skipping herdr config"
 }
+
+# herdr-nvim plugin: the Neovim sidebar and file picker that the herdr config
+# above binds to prefix+e and prefix+o. Installing an already installed plugin
+# rebuilds it, so check the plugin list first.
+$herdrNvimPluginId = "chmarax.herdr-nvim"
+if (Get-Command herdr -ErrorAction SilentlyContinue) {
+    try {
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $herdrPlugins = (& herdr plugin list --json 2>$null | ConvertFrom-Json).result.plugins
+        $ErrorActionPreference = $previousPreference
+        $herdrNvimInstalled = @($herdrPlugins | Where-Object { $_.plugin_id -eq $herdrNvimPluginId }).Count -gt 0
+        if (-not $herdrNvimInstalled) {
+            Write-Info "Installing herdr-nvim plugin..."
+            & herdr plugin install ChmaraX/herdr-nvim
+            if ($LASTEXITCODE -ne 0) {
+                throw "herdr plugin install exited with code $LASTEXITCODE"
+            }
+        }
+        Write-Success "herdr-nvim plugin installed"
+    } catch {
+        Write-Warning "Failed to install herdr-nvim plugin: $_"
+    }
+}
 Write-Host ""
 
 # -----------------------------------------------------------------------------
@@ -335,6 +359,10 @@ if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrConfigPath)) {
     $issues += "herdr config not found at $herdrConfigPath"
+}
+
+if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstalled) {
+    $issues += "herdr-nvim plugin not installed (herdr plugin install ChmaraX/herdr-nvim)"
 }
 
 if ((Get-Command hunk -ErrorAction SilentlyContinue) -and -not (Test-Path "$hunkSkillPath\SKILL.md")) {

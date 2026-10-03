@@ -29,6 +29,25 @@ prefix = "ctrl+space"
 key = "prefix+d"
 type = "pane"
 command = "hunk diff --watch"
+description = "review working tree in hunk"
+
+# Neovim sidebar from the herdr-nvim plugin. Install it once with
+#   herdr plugin install ChmaraX/herdr-nvim
+# herdr binds no keys for plugins, so these two do it. Both keys replace
+# herdr defaults: prefix+e was edit_scrollback and prefix+o was
+# open_notification_target. Free alternatives on herdr 0.9.1 are prefix+f,
+# prefix+i, prefix+m, prefix+u and prefix+a.
+[[keys.command]]
+key = "prefix+e"
+type = "plugin_action"
+command = "chmarax.herdr-nvim.toggle"
+description = "toggle nvim sidebar"
+
+[[keys.command]]
+key = "prefix+o"
+type = "plugin_action"
+command = "chmarax.herdr-nvim.pick-file"
+description = "open file from agent output in nvim sidebar"
 
 [ui]
 status_indicators = "symbols"
