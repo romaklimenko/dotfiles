@@ -199,10 +199,48 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
             if ($LASTEXITCODE -ne 0) {
                 throw "herdr plugin install exited with code $LASTEXITCODE"
             }
+            $herdrNvimInstalled = $true
         }
         Write-Success "herdr-nvim plugin installed"
     } catch {
         Write-Warning "Failed to install herdr-nvim plugin: $_"
+    }
+}
+
+# herdr-bar plugin: the command bar that the herdr config above binds to
+# prefix+space. Windows support lives in the romaklimenko/herdr-bar fork until
+# upstream merges it. A herdr-bar installed from another GitHub repository
+# cannot run on Windows, so it is replaced. A locally linked copy is a
+# development checkout and is left alone.
+$herdrBarRepo = "romaklimenko/herdr-bar"
+$herdrBarInstalled = $false
+if (Get-Command herdr -ErrorAction SilentlyContinue) {
+    try {
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $herdrPlugins = (& herdr plugin list --json 2>$null | ConvertFrom-Json).result.plugins
+        $ErrorActionPreference = $previousPreference
+        $herdrBar = @($herdrPlugins | Where-Object { $_.plugin_id -eq "herdr-bar" })[0]
+        $herdrBarSource = "$($herdrBar.source.owner)/$($herdrBar.source.repo)"
+        if ($herdrBar -and $herdrBar.source.kind -eq "github" -and $herdrBarSource -ne $herdrBarRepo) {
+            Write-Info "Replacing herdr-bar from $herdrBarSource with $herdrBarRepo..."
+            & herdr plugin uninstall herdr-bar
+            if ($LASTEXITCODE -ne 0) {
+                throw "herdr plugin uninstall exited with code $LASTEXITCODE"
+            }
+            $herdrBar = $null
+        }
+        if (-not $herdrBar) {
+            Write-Info "Installing herdr-bar plugin..."
+            & herdr plugin install $herdrBarRepo
+            if ($LASTEXITCODE -ne 0) {
+                throw "herdr plugin install exited with code $LASTEXITCODE"
+            }
+        }
+        $herdrBarInstalled = $true
+        Write-Success "herdr-bar plugin installed"
+    } catch {
+        Write-Warning "Failed to install herdr-bar plugin: $_"
     }
 }
 Write-Host ""
@@ -363,6 +401,28 @@ if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herd
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstalled) {
     $issues += "herdr-nvim plugin not installed (herdr plugin install ChmaraX/herdr-nvim)"
+}
+
+if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrBarInstalled) {
+    $issues += "herdr-bar plugin not installed (herdr plugin install romaklimenko/herdr-bar)"
+}
+
+# herdr starts herdr-bar's commands as `python3`, without a shell. With only
+# the python.org installer, python3 is a Store shortcut that runs no Python.
+if ($herdrBarInstalled) {
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $python3Version = & python3 -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null |
+            Select-Object -First 1
+        $python3Ok = "$python3Version" -match '^\d+\.\d+$' -and [version]"$python3Version" -ge [version]"3.9"
+    } catch {
+        $python3Ok = $false
+    }
+    $ErrorActionPreference = $previousPreference
+    if (-not $python3Ok) {
+        $issues += "herdr-bar needs python3 to start Python 3.9 or later (install Python from the Microsoft Store)"
+    }
 }
 
 if ((Get-Command hunk -ErrorAction SilentlyContinue) -and -not (Test-Path "$hunkSkillPath\SKILL.md")) {

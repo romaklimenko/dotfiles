@@ -49,6 +49,18 @@ type = "plugin_action"
 command = "chmarax.herdr-nvim.pick-file"
 description = "open file from agent output in nvim sidebar"
 
+# Command bar from the herdr-bar plugin: fuzzy-jump to any tab, pane or
+# agent. Windows support lives in the romaklimenko/herdr-bar fork until
+# jeffarese/herdr-bar#12 is merged. Install it once with
+#   herdr plugin install romaklimenko/herdr-bar
+# The plugin's own docs bind prefix+k, which herdr already uses for
+# focus_pane_up. prefix+space is free: press Ctrl+Space, release, then Space.
+[[keys.command]]
+key = "prefix+space"
+type = "plugin_action"
+command = "herdr-bar.open"
+description = "command bar: jump to a tab, pane or agent"
+
 [ui]
 status_indicators = "symbols"
 

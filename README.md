@@ -10,7 +10,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
-  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, and toggles a Neovim sidebar on `prefix+e`
+  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, toggles a Neovim sidebar on `prefix+e`, and opens a command bar that jumps to any tab, pane or agent on `prefix+space`
 
 - **Bash/Zsh Configuration:** Linux shell setup with:
   - Enhanced aliases
@@ -77,9 +77,10 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, and binds `prefix+e` and `prefix+o` to the herdr-nvim plugin:
+5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, binds `prefix+e` and `prefix+o` to the herdr-nvim plugin, and binds `prefix+space` to the herdr-bar command bar:
 ```powershell
 herdr plugin install ChmaraX/herdr-nvim
+herdr plugin install romaklimenko/herdr-bar
 New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
 Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
 herdr server reload-config
@@ -363,6 +364,19 @@ The sidebar runs this repository's Neovim config, because `%LOCALAPPDATA%\nvim` 
 | `Space a i` | `:Herdr ref` | Insert a `path:12-20` reference at the agent's cursor |
 
 Comments live in memory only and are cleared after a successful send. The prompt includes each comment's file and line, the repository and the branch. The plugin binary is not on `PATH`. To check the setup from inside a herdr session, run `herdr-nvim.exe doctor --with-agent claude` from `%APPDATA%\herdr\plugins\github\chmarax.herdr-nvim-*\bin`.
+
+### Windows: command bar inside herdr
+
+The [herdr-bar](https://github.com/jeffarese/herdr-bar) plugin opens a popup that fuzzy-searches every tab, pane, agent and workspace. `windows/herdr/config.toml` binds it to `prefix+space`: press Ctrl+Space, release, then press Space. Type to filter, move with the arrow keys, press Enter to jump and Esc to close. The plugin's own docs suggest `prefix+k`, but herdr already uses that key for `focus_pane_up`.
+
+Upstream herdr-bar runs only on Linux and macOS. The Windows port lives in the [romaklimenko/herdr-bar](https://github.com/romaklimenko/herdr-bar) fork until [jeffarese/herdr-bar#12](https://github.com/jeffarese/herdr-bar/pull/12) is merged. The installer therefore runs `herdr plugin install romaklimenko/herdr-bar`. It replaces a herdr-bar installed from another GitHub repository and leaves a locally linked copy alone.
+
+herdr starts the plugin's commands as `python3`, without a shell. The Microsoft Store build of Python provides `python3`. With only the python.org installer, `python3` is a Store shortcut that prints "Python was not found", and the installer's final checks report it.
+
+The plugin also renames agent tabs to their Claude Code or Codex task title. This is on by default. A tab you rename yourself keeps your name. To turn the renaming off, create `config.json` in the folder that `herdr plugin config-dir herdr-bar` prints:
+```json
+{ "auto_titles": false }
+```
 
 ### Windows: session names in the herdr sidebar
 
