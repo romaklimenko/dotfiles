@@ -1,0 +1,5 @@
+{
+  "scope": "agent",
+  "select_current": true,
+  "follow_new_sessions": true
+}

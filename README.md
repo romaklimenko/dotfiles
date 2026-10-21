@@ -80,9 +80,10 @@ New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\
 5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, binds `prefix+e` and `prefix+o` to the herdr-nvim plugin, and binds `prefix+space` to the herdr-bar command bar:
 ```powershell
 herdr plugin install ChmaraX/herdr-nvim
-herdr plugin install romaklimenko/herdr-bar
+$modulePath = $env:PSModulePath; $env:PSModulePath = $null; herdr plugin install jeffarese/herdr-bar; $env:PSModulePath = $modulePath
 New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
 Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
+Copy-Item .\windows\herdr\plugins\herdr-bar\config.json "$(herdr plugin config-dir herdr-bar)\config.json" -Force
 herdr server reload-config
 ```
 
@@ -174,7 +175,8 @@ dotfiles/
 │   ├── Microsoft.PowerShell_profile.ps1
 │   ├── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
 │   └── herdr/
-│       └── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
+│       ├── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
+│       └── plugins/herdr-bar/config.json # herdr-bar settings, installed to its plugin config folder
 ├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
 │   ├── .bash_aliases
@@ -369,14 +371,13 @@ Comments live in memory only and are cleared after a successful send. The prompt
 
 The [herdr-bar](https://github.com/jeffarese/herdr-bar) plugin opens a popup that fuzzy-searches every tab, pane, agent and workspace. `windows/herdr/config.toml` binds it to `prefix+space`: press Ctrl+Space, release, then press Space. Type to filter, move with the arrow keys, press Enter to jump and Esc to close. The plugin's own docs suggest `prefix+k`, but herdr already uses that key for `focus_pane_up`.
 
-Upstream herdr-bar runs only on Linux and macOS. The Windows port lives in the [romaklimenko/herdr-bar](https://github.com/romaklimenko/herdr-bar) fork until [jeffarese/herdr-bar#12](https://github.com/jeffarese/herdr-bar/pull/12) is merged. The installer therefore runs `herdr plugin install romaklimenko/herdr-bar`. It replaces a herdr-bar installed from another GitHub repository and leaves a locally linked copy alone.
+herdr-bar is a Rust binary, so it needs no Python. Since 0.10.0 its `herdr-bar.open` action works on Windows too, so the config binds that one instead of the older `herdr-bar.open-windows`.
 
-herdr starts the plugin's commands as `python3`, without a shell. The Microsoft Store build of Python provides `python3`. With only the python.org installer, `python3` is a Store shortcut that prints "Python was not found", and the installer's final checks report it.
+The installer installs herdr-bar from `jeffarese/herdr-bar` and updates a release older than 0.11.0, which the settings below need. It replaces a herdr-bar installed from another GitHub repository, such as the old romaklimenko/herdr-bar fork, and leaves a locally linked copy alone. herdr runs the plugin's install step in Windows PowerShell 5.1. Started from PowerShell 7, that step inherits PowerShell 7's `PSModulePath` and cannot find `Get-FileHash`, so the checksum check fails and it quietly builds the binary with cargo instead, or fails without Rust. Clearing `PSModulePath` for the install command, as the installer and step 5 do, lets it download the release binary.
 
-The plugin also renames agent tabs to their Claude Code or Codex task title. This is on by default. A tab you rename yourself keeps your name. To turn the renaming off, create `config.json` in the folder that `herdr plugin config-dir herdr-bar` prints:
-```json
-{ "auto_titles": false }
-```
+`windows/herdr/plugins/herdr-bar/config.json` holds the plugin's settings. The installer copies it to the folder that `herdr plugin config-dir herdr-bar` prints, and backs up a different file it finds there. It sets `"scope": "agent"`, so the bar opens on agents. Backspace on an empty query widens the list to everything, and `ctrl+u` returns to agents. It also sets `"select_current": true`, so the bar opens with the row you are in selected, instead of the row you came from.
+
+The plugin also renames agent tabs to their Claude Code or Codex task title. This is on by default. A tab you rename yourself keeps your name. To turn the renaming off, add `"auto_titles": false` to that `config.json`. By default a tab keeps the title of the session that named it, so after `/clear`, `/resume`, a restarted agent or a new terminal in the pane, it still shows the old task. `config.json` therefore sets `"follow_new_sessions": true` ([#21](https://github.com/jeffarese/herdr-bar/issues/21)), which lets the next session in the same pane take over the tab's title.
 
 ### Windows: session names in the herdr sidebar
 

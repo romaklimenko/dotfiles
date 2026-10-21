@@ -208,11 +208,13 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
 }
 
 # herdr-bar plugin: the command bar that the herdr config above binds to
-# prefix+space. Windows support lives in the romaklimenko/herdr-bar fork until
-# upstream merges it. A herdr-bar installed from another GitHub repository
-# cannot run on Windows, so it is replaced. A locally linked copy is a
-# development checkout and is left alone.
-$herdrBarRepo = "romaklimenko/herdr-bar"
+# prefix+space. Its install step downloads a release binary, so it needs no
+# Python. The plugin config below needs herdr-bar 0.11.0 or later, so an older
+# install is updated. A herdr-bar installed from another GitHub repository,
+# such as the old romaklimenko/herdr-bar fork, is replaced. A locally linked
+# copy is a development checkout and is left alone.
+$herdrBarRepo = "jeffarese/herdr-bar"
+$herdrBarMinVersion = [version]"0.11.0"
 $herdrBarInstalled = $false
 if (Get-Command herdr -ErrorAction SilentlyContinue) {
     try {
@@ -222,7 +224,18 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
         $ErrorActionPreference = $previousPreference
         $herdrBar = @($herdrPlugins | Where-Object { $_.plugin_id -eq "herdr-bar" })[0]
         $herdrBarSource = "$($herdrBar.source.owner)/$($herdrBar.source.repo)"
-        if ($herdrBar -and $herdrBar.source.kind -eq "github" -and $herdrBarSource -ne $herdrBarRepo) {
+        $herdrBarReplace = $herdrBar -and $herdrBar.source.kind -eq "github" -and $herdrBarSource -ne $herdrBarRepo
+        $herdrBarVersion = $null
+        $herdrBarOutdated = $herdrBar -and $herdrBar.source.kind -eq "github" -and
+            -not ([version]::TryParse("$($herdrBar.version)", [ref]$herdrBarVersion) -and $herdrBarVersion -ge $herdrBarMinVersion)
+        if ($herdrBarReplace -or $herdrBarOutdated) {
+            # A title watcher from an older release cannot hand over to the
+            # new one, so stop it first. This only works while herdr runs.
+            $ErrorActionPreference = "Continue"
+            & herdr plugin action invoke herdr-bar.stop-titles *> $null
+            $ErrorActionPreference = $previousPreference
+        }
+        if ($herdrBarReplace) {
             Write-Info "Replacing herdr-bar from $herdrBarSource with $herdrBarRepo..."
             & herdr plugin uninstall herdr-bar
             if ($LASTEXITCODE -ne 0) {
@@ -230,15 +243,55 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
             }
             $herdrBar = $null
         }
-        if (-not $herdrBar) {
+        if (-not $herdrBar -or $herdrBarOutdated) {
             Write-Info "Installing herdr-bar plugin..."
-            & herdr plugin install $herdrBarRepo
+            # herdr runs the plugin's install step in Windows PowerShell 5.1.
+            # With this shell's PowerShell 7 module path it cannot find
+            # Get-FileHash, so the checksum check fails and the step builds
+            # with cargo instead of using the release binary. Without
+            # PSModulePath, Windows PowerShell uses its own default.
+            $savedModulePath = $env:PSModulePath
+            $env:PSModulePath = $null
+            try {
+                & herdr plugin install $herdrBarRepo
+            } finally {
+                $env:PSModulePath = $savedModulePath
+            }
             if ($LASTEXITCODE -ne 0) {
                 throw "herdr plugin install exited with code $LASTEXITCODE"
             }
+            # Start task titles now instead of at the next herdr start.
+            $ErrorActionPreference = "Continue"
+            & herdr plugin action invoke herdr-bar.start-titles *> $null
+            $ErrorActionPreference = $previousPreference
         }
         $herdrBarInstalled = $true
         Write-Success "herdr-bar plugin installed"
+
+        # The plugin's own settings, which open the bar on agents. The plugin
+        # reads config.json from the folder `herdr plugin config-dir` prints.
+        $herdrBarConfigSource = "$dotfilesPath\windows\herdr\plugins\herdr-bar\config.json"
+        $ErrorActionPreference = "Continue"
+        $herdrBarConfigDir = & herdr plugin config-dir herdr-bar 2>$null | Select-Object -Last 1
+        $ErrorActionPreference = $previousPreference
+        if (-not $herdrBarConfigDir) {
+            throw "herdr plugin config-dir printed no folder for herdr-bar"
+        }
+        $herdrBarConfigPath = Join-Path $herdrBarConfigDir "config.json"
+        New-Item -ItemType Directory -Path $herdrBarConfigDir -Force | Out-Null
+        $herdrBarConfigChanged = -not (Test-Path $herdrBarConfigPath) -or
+            (Get-FileHash $herdrBarConfigPath).Hash -ne (Get-FileHash $herdrBarConfigSource).Hash
+        if ($herdrBarConfigChanged) {
+            if ((Test-Path $herdrBarConfigPath) -and -not $SkipBackup) {
+                $backupPath = "$herdrBarConfigPath.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                Write-Warning "Backing up existing herdr-bar config to:"
+                Write-Warning "  $backupPath"
+                Copy-Item $herdrBarConfigPath $backupPath
+            }
+            Copy-Item $herdrBarConfigSource $herdrBarConfigPath -Force
+        }
+        Write-Success "herdr-bar config installed to:"
+        Write-Success "  $herdrBarConfigPath"
     } catch {
         Write-Warning "Failed to install herdr-bar plugin: $_"
     }
@@ -404,25 +457,7 @@ if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstal
 }
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrBarInstalled) {
-    $issues += "herdr-bar plugin not installed (herdr plugin install romaklimenko/herdr-bar)"
-}
-
-# herdr starts herdr-bar's commands as `python3`, without a shell. With only
-# the python.org installer, python3 is a Store shortcut that runs no Python.
-if ($herdrBarInstalled) {
-    $previousPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $python3Version = & python3 -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null |
-            Select-Object -First 1
-        $python3Ok = "$python3Version" -match '^\d+\.\d+$' -and [version]"$python3Version" -ge [version]"3.9"
-    } catch {
-        $python3Ok = $false
-    }
-    $ErrorActionPreference = $previousPreference
-    if (-not $python3Ok) {
-        $issues += "herdr-bar needs python3 to start Python 3.9 or later (install Python from the Microsoft Store)"
-    }
+    $issues += "herdr-bar $herdrBarMinVersion or later not installed (herdr plugin install jeffarese/herdr-bar)"
 }
 
 if ((Get-Command hunk -ErrorAction SilentlyContinue) -and -not (Test-Path "$hunkSkillPath\SKILL.md")) {
