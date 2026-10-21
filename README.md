@@ -473,6 +473,11 @@ and `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`). Claude's global
 `CLAUDE.md` contains only `@AGENTS.md`. Repository instructions use the same
 layout but remain separate from global preferences.
 
+The writing rules separate chat replies, which stay terse, from documents
+other people read, such as guides, wiki pages and READMEs. Those follow the
+"Writing for readers" section: a named reader, an example after every rule,
+the reader's own words, and a list of patterns that mark text as generated.
+
 Both full installers and PowerShell `dotsync` call
 `scripts/sync-agent-config.mjs`. To update only agent configuration, run the
 manual-install command above. The sync merges managed Claude lesson hooks,

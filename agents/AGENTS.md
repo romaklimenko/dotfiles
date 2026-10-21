@@ -5,6 +5,13 @@ Keep shared rules in AGENTS.md; CLAUDE.md contains only an @AGENTS.md include.
 
 # Writing Style
 
+Three kinds of text leave a session. Chat replies to me follow the caveman
+rules below. Code, comments, commits and PRs are normal prose, never
+caveman. Documents other people will read (user docs, wiki pages, guides,
+READMEs, changelogs) are normal prose written for that reader and follow
+"Writing for readers" below. When a chat rule and a reader rule conflict,
+the reader rule wins.
+
 - **Caveman mode is on by default, at `full` intensity.** Follow the
   `caveman` skill for every response, in every project, without being asked.
   Drop articles and filler, fragments are fine, short synonyms win. Technical
@@ -22,10 +29,10 @@ Keep shared rules in AGENTS.md; CLAUDE.md contains only an @AGENTS.md include.
 
 ## Human-Readable Output
 
-These rules cover everything a human reads: chat responses, code comments,
-commit bodies, markdown and docs. Remember that the reader has less context
-than you and is probably skimming. Write so the point lands on the first
-read.
+These rules are the floor for everything a human reads: chat responses, code
+comments, commit bodies, markdown and docs. Remember that the reader has less
+context than you and is probably skimming. Write so the point lands on the
+first read.
 
 - One idea per sentence. If a sentence joins two clauses with "which" or a
   semicolon, it is usually two sentences
@@ -61,6 +68,110 @@ non-contradicting matters more than being short. There:
 Still use short sentences and plain words. Extra length is allowed. Dense,
 hard-to-parse prose is not.
 
+User documentation is not on this list, even when it describes the same
+feature as a spec. A guide follows "Writing for readers" below. Translate
+the spec into the reader's words; never paste its sentences or its defined
+terms into a guide.
+
+## Writing for readers
+
+This section covers text other people will read without me in the room:
+user documentation, wiki pages, guides, READMEs, changelogs and release
+notes. The chat rules make a reply short. They do not make a document
+clear, and applied to a document they produce dense, abstract sentences
+that only the author can decode. When the two conflict, these rules win.
+
+**Know who is reading before you write.** Name the reader and the job they
+are trying to do, in one sentence, and write for that person. Default to
+the person with the least context who still needs the page: a user of the
+product, not its author. They know their own data and tools. They do not
+know the code, the specs, or the words the team uses internally.
+
+**The reader starts anywhere.** People land on a page from search and read
+one section. Each section must make sense on its own. Name the thing
+instead of writing "it", "this" or "the representation", and restate the
+subject when a new section starts. A heading says what the reader can do
+or learn there, in sentence case.
+
+**Concrete beats abstract.** An abstract noun hides the thing the reader
+needs: "the representation", "the approach", "an actual or planned day in
+the business process". Replace it with the column, the command, the file,
+the value. Every rule gets an example right after it, with the exact name
+or code the reader would type. If you cannot write the example, you do not
+understand the rule yet. Vague wording usually means you are not sure how
+the thing behaves: read the code, then write the fact.
+
+**Say what to do, then why.** Open with the action, in the imperative:
+"Set `retention_days` to 365." Follow with what happens and why it matters
+to the reader. Put the condition before the instruction: "If nothing reads
+the table after the weekly load, set it to 7." Never make the reader
+reverse-engineer the instruction from a description of the system.
+
+**Use the reader's words.** Use the names the reader sees: the column, the
+function, the menu label, spelled the same way every time. Do not coin
+terms. A term of art the reader may not know gets one plain sentence of
+definition the first time it appears, or a link to where it is defined. If
+a word would make the reader stop and ask what it means, replace it.
+
+**Unpack, do not compress.** An extra sentence that prevents a question is
+not filler. Do not fold an explanation into one dense, precise sentence;
+three plain sentences beat it. Walk through the common case first and
+completely, then the exceptions.
+
+**Sound like a person explaining it at a desk.** Address the reader as
+"you". Contractions are fine. A short opinion is fine when it helps the
+reader decide: "Most teams never need this." "This is the common case."
+Name the trap the reader is about to fall into and say what it looks like
+when they do. No jokes, no exclamation marks, no "simply", "easily" or
+"just": if it were simple they would not be reading.
+
+**Do not sound like a model.** These patterns mark text as generated.
+Rewrite each one when you see it:
+
+- A clause hanging off the end of a sentence with "-ing": "..., ensuring
+  that...", "..., allowing you to...". Make it its own sentence or cut it
+- "Not X but Y", "not just X", "Y rather than X" used as a frame. State Y
+- "serves as", "acts as", "functions as", "leverages", "facilitates",
+  "enables" where "is", "does" or "uses" would do
+- Groups of three for rhythm: "fast, reliable and scalable"
+- Abstract nouns in place of things: representation, approach, capability,
+  considerations, aspects, mechanism, semantics
+- Openers and signposts: "In this section we will", "Let's", "It's
+  important to note", "Note that", "In summary", "Overall"
+- Hedging on behaviour you know is fixed: "may", "can potentially",
+  "generally"
+- Bold on phrases for emphasis, every bullet opened with a bold label and a
+  colon, headings in Title Case
+
+**Check it as the reader.** Before you finish, read the page as the person
+you named at the start. Every sentence that raises a question ("which
+column?", "what is an actual day?", "where do I set this?") gets rewritten
+or gets its answer. Then read it aloud. A sentence you would not say to a
+colleague gets rewritten.
+
+Before:
+
+> Configure the retention setting according to the operational semantics
+> of the table. Downstream consumers can then rely on the presence of
+> historical rows. Choose the value from the table's purpose, not just its
+> size.
+
+After:
+
+> Set `retention_days` to the number of days reports need to see old rows.
+> A sales fact needs 365, because year-over-year reports read last year's
+> rows. A staging table needs 7, because nothing reads it after the weekly
+> load. The default is 30, which is too short for the first case and too
+> long for the second.
+
+The second version names the setting, gives two real cases with numbers,
+and says why. The first describes the system and leaves the reader to work
+out the instruction.
+
+When in doubt, write the way the Microsoft Writing Style Guide asks: warm
+and relaxed, crisp and clear, ready to lend a hand.
+<https://learn.microsoft.com/en-us/style-guide/top-10-tips-style-voice>
+
 ## Code Style
 
 - Write clean, readable code with meaningful variable and function names
@@ -81,6 +192,7 @@ hard-to-parse prose is not.
 ## Documentation
 
 - If the project has a README.md, update it to reflect any changes you make
+- READMEs, guides, wiki pages and changelogs follow "Writing for readers"
 
 ## Security
 
