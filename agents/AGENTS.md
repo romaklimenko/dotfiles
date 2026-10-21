@@ -107,11 +107,17 @@ to the reader. Put the condition before the instruction: "If nothing reads
 the table after the weekly load, set it to 7." Never make the reader
 reverse-engineer the instruction from a description of the system.
 
-**Use the reader's words.** Use the names the reader sees: the column, the
-function, the menu label, spelled the same way every time. Do not coin
-terms. A term of art the reader may not know gets one plain sentence of
-definition the first time it appears, or a link to where it is defined. If
-a word would make the reader stop and ask what it means, replace it.
+**Use the reader's words, and the field's.** Use the names the reader
+sees: the column, the function, the menu label, spelled the same way every
+time. Where the field has a standard term (Kimball's surrogate key and
+grain, SQL's foreign key, the vendor's product names), use that term, use
+it the way the field does, and give it one plain sentence of definition or
+a link the first time it appears. Readers who know the term are glad to
+see it, and readers who do not can search for it. Never invent a term. The
+test: if the reader searched for the phrase, would they find it in the
+field's books or the vendor's docs? "Surrogate key" passes. "Planned day"
+and "the representation" fail: they are the author's private words, and
+the reader cannot look them up.
 
 **Unpack, do not compress.** An extra sentence that prevents a question is
 not filler. Do not fold an explanation into one dense, precise sentence;
