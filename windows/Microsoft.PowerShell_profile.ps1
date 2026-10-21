@@ -218,6 +218,17 @@ if (-not [Console]::IsOutputRedirected -and $Host.Name -eq 'ConsoleHost' -and (G
     Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
 }
 
+# herdr closes a workspace together with its last pane. When this shell exits
+# as that pane, keep-workspace.ps1 opens a fresh tab first. Only the pane's own
+# shell registers this, not a pwsh started inside it, which sees the marker.
+if ($env:HERDR_PANE_ID -and -not $env:DOTFILES_HERDR_SHELL_PID) {
+    $env:DOTFILES_HERDR_SHELL_PID = "$PID"
+    $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+        $keepWorkspace = Join-Path $env:APPDATA 'herdr\keep-workspace.ps1'
+        if (Test-Path $keepWorkspace) { & $keepWorkspace -Closing shell-exit }
+    }
+}
+
 # -----------------------------------------------------------------------------
 # Custom Prompt
 # -----------------------------------------------------------------------------
