@@ -10,7 +10,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - Useful aliases and functions
   - Git shortcuts
   - WSL integration helpers
-  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, toggles a Neovim sidebar on `prefix+e`, and opens a command bar that jumps to any tab, pane or agent on `prefix+space`
+  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, toggles a Neovim sidebar on `prefix+e`, opens a command bar that jumps to any tab, pane or agent on `prefix+space`, and closes a tab without closing its workspace on `prefix+shift+x`
 
 - **Bash/Zsh Configuration:** Linux shell setup with:
   - Enhanced aliases
@@ -77,11 +77,12 @@ Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
 New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
 ```
 
-5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, binds `prefix+e` and `prefix+o` to the herdr-nvim plugin, and binds `prefix+space` to the herdr-bar command bar:
+5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, binds `prefix+e` and `prefix+o` to the herdr-nvim plugin, binds `prefix+space` to the herdr-bar command bar, and binds `prefix+shift+x` to `close-tab.ps1`, which sits next to the config:
 ```powershell
 herdr plugin install ChmaraX/herdr-nvim
 $modulePath = $env:PSModulePath; $env:PSModulePath = $null; herdr plugin install jeffarese/herdr-bar; $env:PSModulePath = $modulePath
 New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
+Copy-Item .\windows\herdr\close-tab.ps1 "$env:APPDATA\herdr\close-tab.ps1" -Force
 Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
 Copy-Item .\windows\herdr\plugins\herdr-bar\config.json "$(herdr plugin config-dir herdr-bar)\config.json" -Force
 herdr server reload-config
@@ -176,6 +177,7 @@ dotfiles/
 │   ├── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
 │   └── herdr/
 │       ├── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
+│       ├── close-tab.ps1 # prefix+shift+x: closes a tab but keeps its workspace, installed next to config.toml
 │       └── plugins/herdr-bar/config.json # herdr-bar settings, installed to its plugin config folder
 ├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
@@ -337,6 +339,16 @@ If the installer did not run, copy the file yourself and run `herdr server reloa
 The herdr prefix is Ctrl+Space, set in `windows/herdr/config.toml`. Windows Terminal 1.1 and later pass it through unchanged, so no remap is needed. Inside herdr panes Ctrl+Space no longer reaches the shell, so PSReadLine's `MenuComplete` on Ctrl+Space is unavailable there. The PowerShell profile binds `MenuComplete` to Tab, so nothing is lost. herdr 0.9.1 stable accepts a single key for `prefix`; the array form shown in the preview docs is rejected with `invalid type: sequence, expected a string`.
 
 Earlier the prefix was F12, reached through a Windows Terminal binding of Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits `\u001b[24~`, because Ctrl plus a punctuation key yields no character on the Danish layout. That binding lives in Windows Terminal's `settings.json`, not in this repository. It is no longer needed and can be removed.
+
+### Windows: closing the last tab keeps the workspace
+
+herdr closes a workspace together with its last tab, because a workspace must always hold at least one tab. With two tabs, closing one leaves the workspace. With one tab, closing it removes the workspace too. herdr has no setting to change this. [Discussion #1702](https://github.com/herdrdev/herdr/discussions/1702) asks for one.
+
+`windows/herdr/config.toml` therefore binds `prefix+shift+x` to `close-tab.ps1` instead of the built-in `close_tab`. When the active tab is the last one, the script opens a fresh shell tab first and then closes the old tab, so the workspace stays. With more tabs it closes only the active tab, as before. The new tab follows `terminal.new_cwd`, like a tab from `prefix+c`. To close a whole workspace, use `prefix+shift+d`.
+
+herdr runs the command through `cmd.exe` without a window and passes the active workspace and tab in `HERDR_ACTIVE_WORKSPACE_ID` and `HERDR_ACTIVE_TAB_ID`. The tab closes up to a second after the key press, because PowerShell starts first. The installer copies the script to `%APPDATA%\herdr\close-tab.ps1`, next to the config. If a step fails, for example because an ID is missing or the server is unreachable, the script closes nothing.
+
+Only this key keeps the workspace. Typing `exit` in the last shell, `prefix+x` on the last pane, and closing the last pane from its right-click menu still close the workspace.
 
 ### Windows: review diffs with hunk inside herdr
 

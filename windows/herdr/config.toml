@@ -31,6 +31,17 @@ type = "pane"
 command = "hunk diff --watch"
 description = "review working tree in hunk"
 
+# prefix+shift+x closes the tab but keeps the workspace. herdr closes a
+# workspace together with its last tab, so close-tab.ps1 opens a fresh shell
+# tab first when the tab is the last one. This binding replaces the built-in
+# close_tab on the same key. prefix+shift+d still closes a whole workspace.
+# install/install.ps1 copies the script next to this file.
+[[keys.command]]
+key = "prefix+shift+x"
+type = "shell"
+command = 'pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%APPDATA%\herdr\close-tab.ps1"'
+description = "close tab, keep workspace"
+
 # Neovim sidebar from the herdr-nvim plugin. Install it once with
 #   herdr plugin install ChmaraX/herdr-nvim
 # herdr binds no keys for plugins, so these two do it. Both keys replace

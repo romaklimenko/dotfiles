@@ -153,9 +153,13 @@ try {
 # herdr config: new panes open PowerShell 7, so the profile above loads.
 $herdrConfigSource = "$dotfilesPath\windows\herdr\config.toml"
 $herdrConfigPath = "$env:APPDATA\herdr\config.toml"
+$herdrCloseTabPath = "$env:APPDATA\herdr\close-tab.ps1"
 if (Get-Command herdr -ErrorAction SilentlyContinue) {
     try {
         New-Item -ItemType Directory -Path (Split-Path $herdrConfigPath) -Force | Out-Null
+        # The config binds prefix+shift+x to this script, so it must exist
+        # before the reload below applies that binding.
+        Copy-Item "$dotfilesPath\windows\herdr\close-tab.ps1" $herdrCloseTabPath -Force
         $herdrChanged = -not (Test-Path $herdrConfigPath) -or
             (Get-FileHash $herdrConfigPath).Hash -ne (Get-FileHash $herdrConfigSource).Hash
         if ($herdrChanged) {
@@ -175,6 +179,7 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
         }
         Write-Success "herdr config installed to:"
         Write-Success "  $herdrConfigPath"
+        Write-Success "  $herdrCloseTabPath"
     } catch {
         Write-Warning "Failed to install herdr config: $_"
     }
@@ -450,6 +455,10 @@ if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrConfigPath)) {
     $issues += "herdr config not found at $herdrConfigPath"
+}
+
+if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrCloseTabPath)) {
+    $issues += "herdr close-tab script not found at $herdrCloseTabPath"
 }
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstalled) {
