@@ -153,15 +153,13 @@ try {
 # herdr config: new panes open PowerShell 7, so the profile above loads.
 $herdrConfigSource = "$dotfilesPath\windows\herdr\config.toml"
 $herdrConfigPath = "$env:APPDATA\herdr\config.toml"
-$herdrKeepWorkspacePath = "$env:APPDATA\herdr\keep-workspace.ps1"
 if (Get-Command herdr -ErrorAction SilentlyContinue) {
     try {
         New-Item -ItemType Directory -Path (Split-Path $herdrConfigPath) -Force | Out-Null
-        # The config binds prefix+x and prefix+shift+x to this script, and the
-        # profile runs it on exit, so it must exist before the reload below.
-        # close-tab.ps1 is its old name.
-        Copy-Item "$dotfilesPath\windows\herdr\keep-workspace.ps1" $herdrKeepWorkspacePath -Force
-        Remove-Item "$env:APPDATA\herdr\close-tab.ps1" -ErrorAction SilentlyContinue
+        # Earlier versions installed a script that kept a workspace open when
+        # its last tab closed. Shells started back then still run it on exit,
+        # so delete it to stop them from opening new tabs.
+        Remove-Item "$env:APPDATA\herdr\keep-workspace.ps1", "$env:APPDATA\herdr\close-tab.ps1" -ErrorAction SilentlyContinue
         $herdrChanged = -not (Test-Path $herdrConfigPath) -or
             (Get-FileHash $herdrConfigPath).Hash -ne (Get-FileHash $herdrConfigSource).Hash
         if ($herdrChanged) {
@@ -181,7 +179,6 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
         }
         Write-Success "herdr config installed to:"
         Write-Success "  $herdrConfigPath"
-        Write-Success "  $herdrKeepWorkspacePath"
     } catch {
         Write-Warning "Failed to install herdr config: $_"
     }
@@ -457,10 +454,6 @@ if (-not $gitExcludesFile -and -not (Test-Path $gitIgnoreTarget)) {
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrConfigPath)) {
     $issues += "herdr config not found at $herdrConfigPath"
-}
-
-if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not (Test-Path $herdrKeepWorkspacePath)) {
-    $issues += "herdr keep-workspace script not found at $herdrKeepWorkspacePath"
 }
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstalled) {
