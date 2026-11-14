@@ -302,13 +302,13 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
 }
 
 # tmux config. On Windows "tmux" is psmux, which reads ~/.psmux.conf. That
-# file loads the shared ~/.tmux.conf and adds the Windows settings. The pane
-# picker on prefix+Space needs fzf.
+# file loads the shared ~/.tmux.conf and adds the Windows settings.
 $tmuxConfigFiles = [ordered]@{
-    "$dotfilesPath\tmux\tmux.conf"              = "$env:USERPROFILE\.tmux.conf"
-    "$dotfilesPath\windows\psmux\psmux.conf"    = "$env:USERPROFILE\.psmux.conf"
-    "$dotfilesPath\windows\psmux\pick-pane.ps1" = "$env:USERPROFILE\.config\psmux\pick-pane.ps1"
+    "$dotfilesPath\tmux\tmux.conf"           = "$env:USERPROFILE\.tmux.conf"
+    "$dotfilesPath\windows\psmux\psmux.conf" = "$env:USERPROFILE\.psmux.conf"
 }
+# An earlier version installed a pane picker here. prefix+w replaced it.
+Remove-Item "$env:USERPROFILE\.config\psmux\pick-pane.ps1" -ErrorAction SilentlyContinue
 try {
     foreach ($source in $tmuxConfigFiles.Keys) {
         $target = $tmuxConfigFiles[$source]
@@ -332,9 +332,6 @@ try {
 }
 if (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
     Write-Info "tmux not found. Install psmux, which provides it: winget install marlocarlo.psmux"
-}
-if (-not (Get-Command fzf -ErrorAction SilentlyContinue)) {
-    Write-Info "fzf not found. The tmux pane picker needs it: winget install junegunn.fzf"
 }
 Write-Host ""
 

@@ -108,12 +108,10 @@ function dotsync {
     # Editor shim: "vim" runs Neovim for tools that spawn the editor directly.
     New-Item -ItemType Directory -Path "$env:DEV_HOME\.local\bin" -Force | Out-Null
     Copy-Item "$dotfilesPath\windows\bin\*" "$env:DEV_HOME\.local\bin" -Force
-    # tmux (psmux) config and the pane picker. Restart psmux to apply it to
-    # every session; prefix + r reloads only the current one.
+    # tmux (psmux) config. Restart psmux to apply it to every session;
+    # prefix + r reloads only the current one.
     Copy-Item "$dotfilesPath\tmux\tmux.conf" "$env:USERPROFILE\.tmux.conf" -Force
     Copy-Item "$dotfilesPath\windows\psmux\psmux.conf" "$env:USERPROFILE\.psmux.conf" -Force
-    New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\psmux" -Force | Out-Null
-    Copy-Item "$dotfilesPath\windows\psmux\pick-pane.ps1" "$env:USERPROFILE\.config\psmux\pick-pane.ps1" -Force
     & node "$dotfilesPath\scripts\sync-agent-config.mjs" --repo $dotfilesPath --home $env:USERPROFILE
     if ($LASTEXITCODE -ne 0) { throw "Shared agent configuration sync failed." }
     # Global git ignore keeps LESSONS.md out of every repository by default.

@@ -120,10 +120,12 @@ link_file "$DOTFILES_DIR/linux/.bash_aliases" "$HOME/.bash_aliases"
 link_file "$DOTFILES_DIR/linux/.zshrc" "$HOME/.zshrc"
 link_file "$DOTFILES_DIR/linux/.profile" "$HOME/.profile"
 
-# tmux config, shared with Windows, and the pane picker on prefix+Space.
-mkdir -p "$HOME/.config/tmux"
+# tmux config, shared with Windows.
 link_file "$DOTFILES_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
-link_file "$DOTFILES_DIR/tmux/pick-pane.sh" "$HOME/.config/tmux/pick-pane.sh"
+# An earlier version linked a pane picker here. prefix+w replaced it.
+if [ -L "$HOME/.config/tmux/pick-pane.sh" ]; then
+    rm "$HOME/.config/tmux/pick-pane.sh"
+fi
 
 print_success "Shell and tmux configuration files installed"
 echo ""
@@ -228,7 +230,6 @@ ISSUES=()
 [ ! -f "$HOME/.profile" ] && ISSUES+=("~/.profile not found")
 [ ! -d "$NVIM_CONFIG" ] && ISSUES+=("Neovim config not found at $NVIM_CONFIG")
 [ ! -f "$HOME/.tmux.conf" ] && ISSUES+=("~/.tmux.conf not found")
-[ ! -f "$HOME/.config/tmux/pick-pane.sh" ] && ISSUES+=("tmux pane picker not found at ~/.config/tmux/pick-pane.sh")
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
 [ ! -f "$CLAUDE_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Claude instructions not found at $CLAUDE_CONFIG_DIR/AGENTS.md")
 [ ! -f "$CODEX_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Codex instructions not found at $CODEX_CONFIG_DIR/AGENTS.md")
@@ -273,13 +274,10 @@ else
     fi
 fi
 
-for tool in tmux fzf; do
-    if ! command -v "$tool" &> /dev/null; then
-        print_warning "$tool not found. The tmux setup needs tmux and fzf:"
-        print_warning "  sudo apt update && sudo apt install tmux fzf"
-        break
-    fi
-done
+if ! command -v tmux &> /dev/null; then
+    print_warning "tmux not found. Install it to use the tmux configuration:"
+    print_warning "  sudo apt update && sudo apt install tmux"
+fi
 
 echo ""
 print_info "For more information, visit:"

@@ -21,7 +21,7 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
 - **tmux Configuration:** One config for tmux on Ubuntu and psmux on Windows, made for running several coding agents:
   - Ctrl+Space prefix, one session per project opened with `ws`, one window per agent
   - Windows and panes named after the agent's session, or after the folder at a shell prompt
-  - A pane picker on Ctrl+Space, Space that searches every pane in every session, with a live preview
+  - Ctrl+Space, `w` lists every project and agent, so you can switch between them
 
 - **Neovim Configuration:** VS Code-style editing shortcuts, multicursors, Telescope file tabs, and Git previews with Danish-keyboard alternatives (from [romaklimenko/nvim](https://github.com/romaklimenko/nvim))
   - Integrated as git submodule
@@ -92,14 +92,11 @@ Copy-Item .\windows\herdr\plugins\herdr-bar\config.json "$(herdr plugin config-d
 herdr server reload-config
 ```
 
-6. Install the tmux config. On Windows the `tmux` command is psmux, and the pane picker needs fzf:
+6. Install the tmux config. On Windows the `tmux` command is psmux:
 ```powershell
 winget install marlocarlo.psmux
-winget install junegunn.fzf
 Copy-Item .\tmux\tmux.conf "$env:USERPROFILE\.tmux.conf" -Force
 Copy-Item .\windows\psmux\psmux.conf "$env:USERPROFILE\.psmux.conf" -Force
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\psmux" -Force
-Copy-Item .\windows\psmux\pick-pane.ps1 "$env:USERPROFILE\.config\psmux\pick-pane.ps1" -Force
 ```
 
 7. Install shared agent configuration and the global git ignore (Node.js 20+):
@@ -145,11 +142,9 @@ ln -sf ~/dotfiles/linux/.zshrc ~/.zshrc
 ln -sf ~/dotfiles/linux/.profile ~/.profile
 mkdir -p ~/.config
 ln -sf ~/dotfiles/nvim ~/.config/nvim
-mkdir -p ~/.config/tmux
 ln -sf ~/dotfiles/tmux/tmux.conf ~/.tmux.conf
-ln -sf ~/dotfiles/tmux/pick-pane.sh ~/.config/tmux/pick-pane.sh
 ```
-The tmux config needs tmux and fzf: `sudo apt install tmux fzf`.
+The tmux config needs tmux: `sudo apt install tmux`.
 
 4. Install shared agent configuration and the global git ignore (Node.js 20+):
 ```bash
@@ -187,8 +182,7 @@ dotfiles/
 ├── scripts/          # Shared agent sync and README-to-website generation
 ├── tests/            # Isolated lessons and installer suites (npm test)
 ├── tmux/
-│   ├── tmux.conf     # Shared tmux config, installed to ~/.tmux.conf
-│   └── pick-pane.sh  # Pane picker for Ubuntu, installed to ~/.config/tmux/
+│   └── tmux.conf     # Shared tmux config, installed to ~/.tmux.conf
 ├── install/          # Installation scripts and GitHub Pages
 │   ├── install.ps1   # Windows installer
 │   ├── install.sh    # Linux/macOS installer
@@ -200,8 +194,7 @@ dotfiles/
 │   │   ├── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
 │   │   └── plugins/herdr-bar/config.json # herdr-bar settings, installed to its plugin config folder
 │   └── psmux/
-│       ├── psmux.conf    # Windows tmux settings, installed to ~/.psmux.conf
-│       └── pick-pane.ps1 # Pane picker for Windows, installed to ~/.config/psmux/
+│       └── psmux.conf  # Windows tmux settings, installed to ~/.psmux.conf
 ├── linux/            # Linux/macOS/WSL configurations
 │   ├── .bashrc
 │   ├── .bash_aliases
@@ -325,7 +318,7 @@ Create `~/.bashrc.local` (gitignored) and source it from `.bashrc`.
 - Bash/Zsh (Linux)
 - Node.js 20 or newer (for shared agent sync and lessons tools)
 - Neovim (optional, for nvim config)
-- tmux and fzf (optional, for the tmux config). On Windows, psmux provides the `tmux` command
+- tmux (optional, for the tmux config). On Windows, psmux provides the `tmux` command
 
 ## Troubleshooting
 
@@ -477,17 +470,16 @@ The Windows PowerShell profile includes:
 
 The tmux config is for running several coding agents side by side, on Ubuntu and on Windows. On Windows the `tmux` command is [psmux](https://github.com/psmux/psmux), a native Windows terminal multiplexer that reads tmux config files. Both platforms load the same `tmux/tmux.conf`, so the keys and the layout are the same.
 
-Install the tools before you use the config. On Windows:
+Install tmux before you use the config. On Windows:
 
 ```powershell
 winget install marlocarlo.psmux
-winget install junegunn.fzf
 ```
 
 On Ubuntu:
 
 ```bash
-sudo apt install tmux fzf
+sudo apt install tmux
 ```
 
 ### Open one session per project
@@ -505,40 +497,75 @@ In a session, press Ctrl+Space and then `c` to open a new window in the project 
 
 Don't start tmux inside a herdr pane. Both use Ctrl+Space, and herdr catches it first. For the same reason, run Ubuntu's tmux from its own Windows Terminal tab, not from inside a psmux pane.
 
-### Keys
+### Switch between agents with Ctrl+Space, w
 
-The prefix is Ctrl+Space. Press it, release it, and then press the key in the table.
+Press Ctrl+Space, then `w`. A list opens with every session and its windows, one window per agent, named after the agent's session. On Windows it looks like this:
+
+```text
+1. dotfiles: 1 windows (attached)
+2.   1: ✳ Tmux configuration and cross-platform setup* (1 panes)
+3.      ✳ Tmux configuration and cross-platform setup
+4. webshop: 1 windows
+5.   1: ✳ Fix the checkout redirect (1 panes)
+```
+
+A line without indent is a session, one per project. `(attached)` means a terminal shows that session now. An indented line with a number, such as `1:`, is a window in that session, and `*` marks the window you are in. The list unfolds the window you are in, so its pane gets a line of its own below it. That is why line 3 repeats the name in line 2: it is the same agent, once as the window and once as its pane.
+
+Use these keys in the list:
 
 | Keys | Action |
 | --- | --- |
-| Ctrl+Space, Space | Open the pane picker |
+| Up, Down | Move through the list |
+| Enter | Go to the selected window or pane |
+| A line number, then Enter | Go to that line. On Windows the numbers are at the start of each line. On Ubuntu each line starts with a key in brackets, such as `(3)`, and pressing that key goes there at once |
+| Left, Right | Fold or unfold a session or window |
+| `p` on Windows, `v` on Ubuntu | Show or hide a preview of the selected window |
+| `x` | Close the selected window, after you confirm |
+| Esc or `q` | Close the list |
+
+Ctrl+Space, `s` shows only the sessions, one per project. On Windows, press `f` there and type to filter the sessions by name.
+
+### Keys
+
+The prefix is Ctrl+Space. Press it, release it, and then press the key in the table. Ctrl+Space, `?` lists every key.
+
+| Keys | Action |
+| --- | --- |
+| Ctrl+Space, `w` | List sessions and windows, and switch |
+| Ctrl+Space, `s` | List sessions, and switch |
+| Ctrl+Space, `(` or `)` | Go to the previous or next session |
+| Ctrl+Space, `1` to `9` | Go to that window |
+| Ctrl+Space, `n` or `p` | Go to the next or previous window |
 | Ctrl+Space, `c` | Open a new window in the current pane's folder |
+| Ctrl+Space, `,` | Rename the window. The name stays until you rename it again |
+| Ctrl+Space, `&` | Close the window, after you confirm |
 | Ctrl+Space, `"` | Split the pane into top and bottom, in the same folder |
 | Ctrl+Space, `%` | Split the pane into left and right, in the same folder |
 | Ctrl+Space, `h` `j` `k` `l` | Move to the pane on the left, below, above or on the right |
-| Ctrl+Space, `1` to `9` | Go to that window |
-| Ctrl+Space, `w` | Show the built-in tree of sessions and windows |
+| Ctrl+Space, `z` | Zoom the pane to the full window, or back |
+| Ctrl+Space, `!` | Move the pane to a window of its own |
+| Ctrl+Space, `x` | Close the pane, after you confirm |
+| Ctrl+Space, `[` | Scroll back through the pane's output. Arrows and PgUp move, `q` leaves. The mouse wheel scrolls too |
+| Ctrl+Space, `$` | Rename the session |
 | Ctrl+Space, `d` | Detach. The session keeps running, and `ws` brings it back |
 | Ctrl+Space, `r` | Reload the config |
+| Ctrl+Space, `:` | Type a tmux command, such as `kill-session` |
 | Ctrl+Space, Ctrl+Space | Send Ctrl+Space to the program in the pane |
 
-If you come from the herdr config in this repository, the prefix, `h` `j` `k` `l` and Ctrl+Space, Space work the same way. Ctrl+Space, `d` is different: herdr opened hunk with it, and tmux detaches.
+These commands work in any shell:
 
-### Jump to an agent with the pane picker
+| Command | Action |
+| --- | --- |
+| `tmux ls` | List the running sessions |
+| `ws webshop` | Open or go back to a project's session |
+| `tmux kill-session -t webshop` | Close one session and everything running in it |
+| `tmux kill-server` | Close every session |
 
-Press Ctrl+Space, then Space. A popup lists every pane in every session:
-
-```text
-webshop          1.1   Fix the checkout redirect
-webshop          2.1   webshop
-dotfiles         1.1   Tmux configuration and cross-platform setup
-```
-
-Each line shows the session, the window and pane number, and the pane name. Type to filter, press Enter to jump to the pane, and press Esc to close the popup. The right side of the popup shows the selected pane's screen, so you can see what an agent is doing before you jump.
+If you come from the herdr config in this repository, the prefix and `h` `j` `k` `l` work the same way. Two keys differ. Ctrl+Space, `d` opened hunk in herdr; tmux detaches. Ctrl+Space, Space opened herdr's command bar; tmux changes the layout of a split window, and Ctrl+Space, `w` is the list to use instead.
 
 ### How panes get their names
 
-Claude Code sets the terminal title to its session name, with a status symbol in front, such as `✳ Translate recent articles to Danish`. The config shows that title without the symbol. The same name appears in the status bar, in the picker and in the Windows Terminal tab title, after the session name.
+Claude Code sets the terminal title to its session name, with a status symbol in front, such as `✳ Translate recent articles to Danish`. The config shows that title without the symbol. The same name appears in the status bar, in the Windows Terminal tab title after the session name, and on Ubuntu in Ctrl+Space, `w`.
 
 Other panes are named this way:
 
@@ -548,12 +575,12 @@ Other panes are named this way:
 
 ### What is different on Windows
 
-psmux works differently from tmux in a few places. `windows/psmux/psmux.conf` and the Windows picker work around them:
+psmux works differently from tmux in a few places, and `windows/psmux/psmux.conf` works around them:
 
 - psmux ignores the titles that programs set, unless `allow-set-title` is on. The shared config turns it on.
-- psmux has no `automatic-rename-format`, so window names can't use the pane names above. `~/.psmux.conf` names each window after its raw terminal title instead. Ctrl+Space, `w` shows titles with the status symbol, and windows at a prompt show `C:\Program Files\PowerShell\7\pwsh.exe`. The status bar and the picker are not affected.
+- psmux has no `automatic-rename-format`, so window names can't use the pane names above. `~/.psmux.conf` names each window after its raw terminal title instead. Ctrl+Space, `w` shows agent titles with the status symbol, such as `✳ Fix the checkout redirect`, and windows at a prompt show `C:\Program Files\PowerShell\7\pwsh.exe`. The status bar is not affected.
+- psmux updates window names only for the session that is on screen. In Ctrl+Space, `w`, the windows of another project can show an older name until you visit that project.
 - psmux runs one server per session. Ctrl+Space, `r` reloads the config only in the current session. To apply a config change everywhere, run `tmux kill-server` and open your projects again. This closes every session.
-- psmux reads new pane titles only for a session that is on screen. The picker asks every session to refresh its titles before it lists them, so the names it shows are current.
 - New panes start PowerShell 7, so the profile and its functions, such as `ws`, are available.
 
 ### Restore sessions after a restart
@@ -565,9 +592,7 @@ Sessions don't survive a reboot or `tmux kill-server`. Run `ws` for each project
 | File in this repository | Installed to | Used by |
 | --- | --- | --- |
 | `tmux/tmux.conf` | `~/.tmux.conf` | tmux and psmux |
-| `tmux/pick-pane.sh` | `~/.config/tmux/pick-pane.sh` | tmux on Ubuntu |
 | `windows/psmux/psmux.conf` | `~/.psmux.conf` | psmux |
-| `windows/psmux/pick-pane.ps1` | `~/.config/psmux/pick-pane.ps1` | psmux |
 
 psmux reads `~/.psmux.conf` before `~/.tmux.conf`. That file sets `@psmux`, loads `~/.tmux.conf` and then applies the Windows settings. The shared config puts tmux-only options in `%if "#{!=:#{@psmux},1}"` blocks, because psmux prints a warning for every option it doesn't have.
 
