@@ -133,6 +133,26 @@ fd() {
     find . -type d -name "*$1*"
 }
 
+# tmux: open a project folder as a session named after the folder.
+# "ws" opens the current folder, "ws webshop" opens ./webshop or ~/webshop. Outside
+# tmux it attaches; inside tmux it switches to the session instead of nesting.
+ws() {
+    # Not "path": zsh ties that name to $PATH.
+    local folder="${1:-.}" dir name
+    if [ ! -d "$folder" ] && [ -d "$HOME/$folder" ]; then
+        folder="$HOME/$folder"
+    fi
+    dir=$(cd "$folder" && pwd) || return
+    # tmux does not allow . or : in session names.
+    name=$(basename "$dir" | tr '.:' '__')
+    tmux has-session -t "=$name" 2>/dev/null || tmux new-session -d -s "$name" -c "$dir"
+    if [ -n "$TMUX" ]; then
+        tmux switch-client -t "=$name"
+    else
+        tmux attach-session -t "=$name"
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # System Information
 # -----------------------------------------------------------------------------

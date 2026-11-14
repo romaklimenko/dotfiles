@@ -108,6 +108,12 @@ function dotsync {
     # Editor shim: "vim" runs Neovim for tools that spawn the editor directly.
     New-Item -ItemType Directory -Path "$env:DEV_HOME\.local\bin" -Force | Out-Null
     Copy-Item "$dotfilesPath\windows\bin\*" "$env:DEV_HOME\.local\bin" -Force
+    # tmux (psmux) config and the pane picker. Restart psmux to apply it to
+    # every session; prefix + r reloads only the current one.
+    Copy-Item "$dotfilesPath\tmux\tmux.conf" "$env:USERPROFILE\.tmux.conf" -Force
+    Copy-Item "$dotfilesPath\windows\psmux\psmux.conf" "$env:USERPROFILE\.psmux.conf" -Force
+    New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\psmux" -Force | Out-Null
+    Copy-Item "$dotfilesPath\windows\psmux\pick-pane.ps1" "$env:USERPROFILE\.config\psmux\pick-pane.ps1" -Force
     & node "$dotfilesPath\scripts\sync-agent-config.mjs" --repo $dotfilesPath --home $env:USERPROFILE
     if ($LASTEXITCODE -ne 0) { throw "Shared agent configuration sync failed." }
     # Global git ignore keeps LESSONS.md out of every repository by default.
@@ -144,6 +150,28 @@ function dotpull {
 # WSL integration
 function ubuntu { wsl -d Ubuntu $args }
 function wslh { wsl ~ }
+
+# tmux (psmux): open a project folder as a session named after the folder.
+# "ws" opens the current folder, "ws webshop" opens C:\home\webshop. Outside tmux
+# it attaches; inside tmux it switches to the session instead of nesting.
+function ws {
+    param([string]$Path = ".")
+    if (-not (Test-Path $Path -PathType Container) -and (Test-Path "$env:DEV_HOME\$Path" -PathType Container)) {
+        $Path = "$env:DEV_HOME\$Path"
+    }
+    $dir = (Resolve-Path $Path -ErrorAction Stop).ProviderPath
+    # tmux does not allow . or : in session names.
+    $name = (Split-Path $dir -Leaf) -replace '[.:]', '_'
+    tmux has-session -t "=$name" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        tmux new-session -d -s $name -c $dir
+    }
+    if ($env:TMUX) {
+        tmux switch-client -t "=$name"
+    } else {
+        tmux attach-session -t "=$name"
+    }
+}
 
 # Utility functions
 function which ($command) {

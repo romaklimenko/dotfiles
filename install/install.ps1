@@ -300,6 +300,42 @@ if (Get-Command herdr -ErrorAction SilentlyContinue) {
         Write-Warning "Failed to install herdr-bar plugin: $_"
     }
 }
+
+# tmux config. On Windows "tmux" is psmux, which reads ~/.psmux.conf. That
+# file loads the shared ~/.tmux.conf and adds the Windows settings. The pane
+# picker on prefix+Space needs fzf.
+$tmuxConfigFiles = [ordered]@{
+    "$dotfilesPath\tmux\tmux.conf"              = "$env:USERPROFILE\.tmux.conf"
+    "$dotfilesPath\windows\psmux\psmux.conf"    = "$env:USERPROFILE\.psmux.conf"
+    "$dotfilesPath\windows\psmux\pick-pane.ps1" = "$env:USERPROFILE\.config\psmux\pick-pane.ps1"
+}
+try {
+    foreach ($source in $tmuxConfigFiles.Keys) {
+        $target = $tmuxConfigFiles[$source]
+        New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+        $tmuxChanged = -not (Test-Path $target) -or
+            (Get-FileHash $target).Hash -ne (Get-FileHash $source).Hash
+        if ($tmuxChanged) {
+            if ((Test-Path $target) -and -not $SkipBackup) {
+                $backupPath = "$target.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+                Write-Warning "Backing up existing tmux file to:"
+                Write-Warning "  $backupPath"
+                Copy-Item $target $backupPath
+            }
+            Copy-Item $source $target -Force
+        }
+        Write-Success "tmux config installed to:"
+        Write-Success "  $target"
+    }
+} catch {
+    Write-Warning "Failed to install tmux config: $_"
+}
+if (-not (Get-Command tmux -ErrorAction SilentlyContinue)) {
+    Write-Info "tmux not found. Install psmux, which provides it: winget install marlocarlo.psmux"
+}
+if (-not (Get-Command fzf -ErrorAction SilentlyContinue)) {
+    Write-Info "fzf not found. The tmux pane picker needs it: winget install junegunn.fzf"
+}
 Write-Host ""
 
 # -----------------------------------------------------------------------------
@@ -462,6 +498,12 @@ if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrNvimInstal
 
 if ((Get-Command herdr -ErrorAction SilentlyContinue) -and -not $herdrBarInstalled) {
     $issues += "herdr-bar $herdrBarMinVersion or later not installed (herdr plugin install jeffarese/herdr-bar)"
+}
+
+foreach ($target in $tmuxConfigFiles.Values) {
+    if (-not (Test-Path $target)) {
+        $issues += "tmux config not found at $target"
+    }
 }
 
 if ((Get-Command hunk -ErrorAction SilentlyContinue) -and -not (Test-Path "$hunkSkillPath\SKILL.md")) {
