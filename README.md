@@ -525,6 +525,8 @@ Use these keys in the list:
 
 Ctrl+Space, `s` shows only the sessions, one per project. On Windows, press `f` there and type to filter the sessions by name.
 
+Both lists open without the preview. On Windows, psmux remembers `p` in each terminal: after you show the preview, it opens with every list until you press `p` again or detach.
+
 ### Keys
 
 The prefix is Ctrl+Space. Press it, release it, and then press the key in the table. Ctrl+Space, `?` lists every key.
@@ -545,7 +547,8 @@ The prefix is Ctrl+Space. Press it, release it, and then press the key in the ta
 | Ctrl+Space, `z` | Zoom the pane to the full window, or back |
 | Ctrl+Space, `!` | Move the pane to a window of its own |
 | Ctrl+Space, `x` | Close the pane, after you confirm |
-| Ctrl+Space, `[` | Scroll back through the pane's output. Arrows and PgUp move, `q` leaves. The mouse wheel scrolls too |
+| Ctrl+Space, `[` | Scroll back through the pane's output and copy text, as described in "Copy text" below. `q` leaves. The mouse wheel scrolls too |
+| Ctrl+Space, `]` | Paste the text you copied last in tmux |
 | Ctrl+Space, `$` | Rename the session |
 | Ctrl+Space, `d` | Detach. The session keeps running, and `ws` brings it back |
 | Ctrl+Space, `r` | Reload the config |
@@ -562,6 +565,28 @@ These commands work in any shell:
 | `tmux kill-server` | Close every session |
 
 If you come from the herdr config in this repository, the prefix and `h` `j` `k` `l` work the same way. Two keys differ. Ctrl+Space, `d` opened hunk in herdr; tmux detaches. Ctrl+Space, Space opened herdr's command bar; tmux changes the layout of a split window, and Ctrl+Space, `w` is the list to use instead.
+
+### Copy text
+
+Copied text goes to the Windows clipboard, so you can paste it anywhere with Ctrl+V. On Ubuntu, tmux hands the text to Windows Terminal, which puts it on the clipboard.
+
+To copy with the mouse, drag over the text in a shell pane. The text is copied when you release the button.
+
+Some programs take the mouse for themselves, and Claude Code can be one of them. If a drag selects nothing, use one of these instead:
+
+- Hold Shift while you drag. Windows Terminal selects the text itself. Press Ctrl+C, press Enter or right-click to copy it. This selects what is on the screen, so with split panes the selection can run into the next pane.
+- Press Ctrl+Space, then `[`, and then drag. In copy mode tmux handles the mouse, whatever program runs in the pane.
+
+To copy older output, scroll up with the mouse wheel first. Scrolling puts the pane in copy mode, and you can drag there. If the program in the pane takes the mouse wheel too, press Ctrl+Space, then `[`, and scroll up with PgUp.
+
+To copy with the keyboard:
+
+1. Press Ctrl+Space, then `[`. The pane's view stops following new output, and a cursor appears that you can move.
+2. Move to the start of the text with the arrow keys, PgUp and PgDn.
+3. Press Space to start the selection, and move to the end of the text.
+4. Press Enter. tmux copies the text and leaves copy mode.
+
+In copy mode, Esc clears a selection you started, and `q` leaves without copying. Copy mode uses vi keys on both platforms, so `/` searches forward and `?` searches back.
 
 ### How panes get their names
 
