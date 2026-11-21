@@ -26,7 +26,6 @@ Dotfiles for macOS and Ubuntu by Roman Klimenko ([@romaklimenko](https://github.
   - Settings sync preserves unrelated local settings, hooks and Codex notifications
   - Shared project, workspace and user lessons: Claude extracts them through hooks; Codex reads and records them through the portable lessons command
   - Custom Claude slash commands, including `/lessons` for locations and pipeline health
-  - hunk's bundled review skill linked for Claude Code, so it can annotate a live hunk diff
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
   - A Brewfile with the command-line tools for the Mac
@@ -88,11 +87,6 @@ touch ~/.config/git/ignore
 while IFS= read -r pattern || [ -n "$pattern" ]; do
     grep -Fxq -- "$pattern" ~/.config/git/ignore || printf '\n%s\n' "$pattern" >> ~/.config/git/ignore
 done < ~/Work/dotfiles/git/ignore
-```
-If hunk is installed (`npm install -g hunkdiff`), link its review skill for Claude Code:
-```bash
-mkdir -p ~/.claude/skills
-ln -s "$(dirname "$(hunk skill path hunk-review)")" ~/.claude/skills/hunk-review
 ```
 
 6. Open a new terminal, or run `exec zsh`.
@@ -274,10 +268,6 @@ Run the installer with bash instead of executing it:
 ```bash
 bash install/install.sh --local
 ```
-
-### tmux and herdr
-
-Don't start tmux inside a herdr pane if both use the same prefix: herdr catches the key first.
 
 ## Shell Reference
 
@@ -559,7 +549,6 @@ Existing Claude behavior is retained:
   - Escape hatches: `CC_LESSONS_DISABLE=1` skips a session (the sweep honours it too), `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_COMPACT_MODEL` (default `sonnet`), `CC_LESSONS_COMPACT_AT_CHARS` (default `10240`), `CC_LESSONS_COMPACT_HOURS` (default `24`), `CC_LESSONS_COMPACT_REJECT_HOURS` (default `168`), `CC_LESSONS_MIN_TURNS` (default `6`, for `Stop`), `CC_LESSONS_MIN_TURNS_FINAL` (default `3`, for `SessionEnd`, `PreCompact` and the sweep), `CC_LESSONS_STOP_MINUTES` (default `30`)
   - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Passing the prompt on stdin keeps a long transcript clear of the command-line length limit
   - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline and portable writer/install tests against isolated fixtures and a fake `claude`
-- **Skills:** The installer links hunk's bundled `hunk-review` skill to `~/.claude/skills/hunk-review` when hunk is installed (`npm install -g hunkdiff`). It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands, so a typical layout is hunk in one tmux pane and Claude Code in the next
 - **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
   - Check which you have with `ls -l ~/.claude/hooks`

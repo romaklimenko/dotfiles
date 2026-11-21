@@ -236,9 +236,9 @@ When the session is in a sub-repo:
 - Workspace-level files such as notes, todo lists and checklists describe more
   than one repository. Read the ones the workspace file points to. Paths in
   them are relative to the workspace root, not to the repository.
-- Diff review tools such as hunk see only the repository the session started
-  in. One session therefore covers one repository. A task that spans several
-  repositories is split into one session and one change per repository.
+- One session covers one repository, because diffs and reviews only show the
+  repository the session started in. A task that spans several repositories
+  is split into one session and one change per repository.
 
 ## Lessons
 

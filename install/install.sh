@@ -182,17 +182,6 @@ fi
 # Agent sync backs up changed managed files and retains unrelated settings.
 node "$DOTFILES_DIR/scripts/sync-agent-config.mjs" --repo "$DOTFILES_DIR" --home "$HOME"
 
-# hunk ships a review skill for Claude Code. Link it, so it follows hunk
-# updates without another sync.
-if command -v hunk &> /dev/null; then
-    HUNK_SKILL="$(hunk skill path hunk-review 2>/dev/null || true)"
-    HUNK_LINK="$CLAUDE_CONFIG_DIR/skills/hunk-review"
-    if [ -n "$HUNK_SKILL" ] && { [ ! -e "$HUNK_LINK" ] || [ -L "$HUNK_LINK" ]; }; then
-        mkdir -p "$CLAUDE_CONFIG_DIR/skills"
-        ln -sfn "$(dirname "$HUNK_SKILL")" "$HUNK_LINK"
-        print_success "Linked the hunk-review skill to $HUNK_LINK"
-    fi
-fi
 echo ""
 
 # -----------------------------------------------------------------------------
