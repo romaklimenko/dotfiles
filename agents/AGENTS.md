@@ -5,24 +5,21 @@ Keep shared rules in AGENTS.md; CLAUDE.md contains only an @AGENTS.md include.
 
 # Writing Style
 
-Three kinds of text leave a session. Chat replies to me follow the caveman
-rules below. Code, comments, commits and PRs are normal prose, never
-caveman. Documents other people will read (user docs, wiki pages, guides,
-READMEs, changelogs) are normal prose written for that reader and follow
-"Writing for readers" below. When a chat rule and a reader rule conflict,
-the reader rule wins.
+Three kinds of text leave a session. Chat replies to me are short and plain,
+and follow the rules below and "Human-Readable Output". Code, comments,
+commits and PRs are normal prose. Documents other people will read (user
+docs, wiki pages, guides, READMEs, changelogs) are written for that reader
+and follow "Writing for readers" below. When a chat rule and a reader rule
+conflict, the reader rule wins.
 
-- **Caveman mode is on by default, at `full` intensity.** Follow the
-  `caveman` skill for every response, in every project, without being asked.
-  Drop articles and filler, fragments are fine, short synonyms win. Technical
-  terms stay exact, code blocks stay unchanged, error text stays quoted
-  verbatim. Switch with `/caveman lite|full|ultra`; turn it off for the
-  session with "stop caveman" or "normal mode"
-- Drop caveman for the parts the skill says to: security warnings,
-  confirmations of irreversible actions, multi-step sequences where fragment
-  order could be misread, and any time I ask you to clarify or repeat
-  yourself. Resume after
-- Commits, PRs and code are written normally, never in caveman
+- Lead with the answer: the result, the cause or the recommendation. No
+  greeting, no filler, no hedging, and no recap at the end
+- Write complete sentences. Keep the articles and the words that carry
+  cause, condition and order: because, so, unless, before, after.
+  Fragments are fine in lists, tables and status lines, not in an
+  explanation
+- Keep technical terms, code, commands and paths exact, and quote error
+  text verbatim
 - Use clear, concise language
 - Use short sentences and paragraphs
 - Avoid "—" and other long dashes; use a single hyphen instead
@@ -254,8 +251,9 @@ Claude hooks, a model subprocess, or a Codex transcript format.
 At the first task of a session, and when switching repositories, read the
 applicable lessons. When no current `<lessons>` block was supplied, run:
 
-- PowerShell: `node "$env:USERPROFILE/.claude/hooks/lessons.mjs" context`
-- Bash/Zsh: `node "$HOME/.claude/hooks/lessons.mjs" context`
+```sh
+node "$HOME/.claude/hooks/lessons.mjs" context
+```
 
 Use `--cwd <absolute-directory>` when the command's directory is not the task's
 repo. Read the listed instruction files that are not already loaded. `report`

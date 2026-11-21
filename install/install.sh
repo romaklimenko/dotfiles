@@ -1,10 +1,24 @@
 #!/bin/bash
 # ============================================================================
-# Linux/WSL Dotfiles Installation Script
+# Dotfiles installation for macOS and Ubuntu
 # Author: Roman Klimenko (@romaklimenko)
+#
+#   curl -fsSL dotfiles.klimenko.dk/install.sh | bash   # clone or pull, then apply
+#   bash install/install.sh --local                     # apply this checkout as it is
+#
+# The repository goes to $DOTFILES_HOME, by default ~/Work/dotfiles.
+# Running it again is safe: links that are already right are left alone.
 # ============================================================================
 
 set -e
+
+LOCAL=false
+for arg in "$@"; do
+    case "$arg" in
+        --local) LOCAL=true ;;
+        *) echo "Usage: install.sh [--local]" >&2; exit 2 ;;
+    esac
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -18,22 +32,20 @@ print_info() { echo -e "${CYAN}$1${NC}"; }
 print_warning() { echo -e "${YELLOW}$1${NC}"; }
 print_error() { echo -e "${RED}$1${NC}"; }
 
-print_info "============================================================================"
-print_info "Installing dotfiles for Linux/WSL..."
-print_info "============================================================================"
-echo ""
-
 # -----------------------------------------------------------------------------
 # Step 1: Detect environment
 # -----------------------------------------------------------------------------
 
-print_info "[1/9] Detecting environment..."
-IS_WSL=false
-if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null; then
-    print_success "WSL detected"
-    IS_WSL=true
+print_info "[1/8] Detecting environment..."
+OS=linux
+if [ "$(uname -s)" = Darwin ]; then
+    OS=macos
+    print_success "macOS detected"
+elif [ -r /etc/os-release ] && grep -q '^ID=ubuntu' /etc/os-release; then
+    OS=ubuntu
+    print_success "Ubuntu detected"
 else
-    print_success "Standalone Linux detected"
+    print_warning "Linux detected. Only macOS and Ubuntu are tested"
 fi
 echo ""
 
@@ -41,27 +53,33 @@ echo ""
 # Step 2: Clone or update dotfiles repository
 # -----------------------------------------------------------------------------
 
-DOTFILES_DIR="$HOME/dotfiles"
 DOTFILES_REPO="https://github.com/romaklimenko/dotfiles.git"
 
-print_info "[2/9] Setting up dotfiles repository..."
-if [ ! -d "$DOTFILES_DIR" ]; then
-    print_info "Cloning dotfiles repository..."
-    if git clone "$DOTFILES_REPO" "$DOTFILES_DIR"; then
-        print_success "Cloned dotfiles repository"
-    else
-        print_error "Failed to clone repository"
-        print_info "Make sure Git is installed and you have internet connection"
-        exit 1
-    fi
+print_info "[2/8] Setting up dotfiles repository..."
+if [ "$LOCAL" = true ]; then
+    DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    print_success "Using the local checkout in $DOTFILES_DIR"
 else
-    print_info "Dotfiles repository already exists, updating..."
-    cd "$DOTFILES_DIR"
-    if git pull; then
-        print_success "Updated dotfiles repository"
+    DEV_HOME="${DEV_HOME:-$HOME/Work}"
+    DOTFILES_DIR="${DOTFILES_HOME:-$DEV_HOME/dotfiles}"
+    if [ ! -d "$DOTFILES_DIR" ]; then
+        print_info "Cloning dotfiles repository to $DOTFILES_DIR..."
+        mkdir -p "$(dirname "$DOTFILES_DIR")"
+        if git clone "$DOTFILES_REPO" "$DOTFILES_DIR"; then
+            print_success "Cloned dotfiles repository"
+        else
+            print_error "Failed to clone repository"
+            print_info "Make sure Git is installed and you have internet connection"
+            exit 1
+        fi
     else
-        print_warning "Failed to update repository"
-        print_warning "Continuing with existing files..."
+        print_info "Dotfiles repository already exists, updating..."
+        if git -C "$DOTFILES_DIR" pull; then
+            print_success "Updated dotfiles repository"
+        else
+            print_warning "Failed to update repository"
+            print_warning "Continuing with existing files..."
+        fi
     fi
 fi
 
@@ -69,15 +87,28 @@ cd "$DOTFILES_DIR"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 3: Initialize Neovim submodule
+# Step 3: Neovim submodule and oh-my-zsh
 # -----------------------------------------------------------------------------
 
-print_info "[3/9] Setting up Neovim configuration..."
-if git submodule init && git submodule update --remote; then
+print_info "[3/8] Setting up Neovim configuration and oh-my-zsh..."
+if [ "$LOCAL" = true ]; then
+    # Only fill an empty submodule; never move it to another commit.
+    if [ ! -e nvim/init.lua ] && git submodule update --init; then
+        print_success "Neovim configuration checked out"
+    fi
+elif git submodule update --init --remote; then
     print_success "Neovim configuration ready"
 else
     print_warning "Failed to initialize Neovim submodule"
     print_warning "You may need to initialize it manually later"
+fi
+
+if [ -d "$HOME/.oh-my-zsh" ]; then
+    print_success "oh-my-zsh is installed"
+elif git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"; then
+    print_success "Installed oh-my-zsh to ~/.oh-my-zsh"
+else
+    print_warning "Failed to install oh-my-zsh. zsh works without it, minus the aliases"
 fi
 echo ""
 
@@ -85,23 +116,26 @@ echo ""
 # Helper function for backing up and linking files
 # -----------------------------------------------------------------------------
 
-backup_file() {
-    local file=$1
-    if [ -e "$file" ] || [ -L "$file" ]; then
-        local backup="$file.backup-$(date +%Y%m%d-%H%M%S)"
-        print_warning "Backing up existing file to:"
-        print_warning "  $backup"
-        mv "$file" "$backup"
-    fi
-}
-
 link_file() {
     local source=$1
     local target=$2
 
-    backup_file "$target"
+    # Already linked to this source: nothing to do.
+    if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
+        print_success "Linked: $target"
+        return 0
+    fi
 
-    if ln -sf "$source" "$target"; then
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        local backup
+        backup="$target.backup-$(date +%Y%m%d-%H%M%S)"
+        print_warning "Backing up existing file to:"
+        print_warning "  $backup"
+        mv "$target" "$backup"
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    if ln -s "$source" "$target"; then
         print_success "Linked: $target -> $source"
     else
         print_error "Failed to link: $target"
@@ -110,58 +144,35 @@ link_file() {
 }
 
 # -----------------------------------------------------------------------------
-# Step 4: Link shell configuration files
+# Step 4: Link shell, tmux and Neovim configuration
 # -----------------------------------------------------------------------------
 
-print_info "[4/9] Installing shell and tmux configuration files..."
+print_info "[4/8] Linking shell, tmux and Neovim configuration..."
 
-link_file "$DOTFILES_DIR/linux/.bashrc" "$HOME/.bashrc"
-link_file "$DOTFILES_DIR/linux/.bash_aliases" "$HOME/.bash_aliases"
-link_file "$DOTFILES_DIR/linux/.zshrc" "$HOME/.zshrc"
-link_file "$DOTFILES_DIR/linux/.profile" "$HOME/.profile"
-
-# tmux config, shared with Windows.
+link_file "$DOTFILES_DIR/shell/.zshrc" "$HOME/.zshrc"
+link_file "$DOTFILES_DIR/shell/.zprofile" "$HOME/.zprofile"
+link_file "$DOTFILES_DIR/shell/.bashrc" "$HOME/.bashrc"
+link_file "$DOTFILES_DIR/shell/.profile" "$HOME/.profile"
 link_file "$DOTFILES_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
-# An earlier version linked a pane picker here. prefix+w replaced it.
-if [ -L "$HOME/.config/tmux/pick-pane.sh" ]; then
-    rm "$HOME/.config/tmux/pick-pane.sh"
-fi
+link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
 
-print_success "Shell and tmux configuration files installed"
+# Earlier versions linked these. .bashrc now loads .bash_aliases from the
+# repository, and prefix + w replaced the pane picker.
+for old in "$HOME/.bash_aliases" "$HOME/.config/tmux/pick-pane.sh"; do
+    if [ -L "$old" ] && case "$(readlink "$old")" in "$DOTFILES_DIR"/*) true ;; *) false ;; esac; then
+        rm "$old"
+        print_success "Removed old link: $old"
+    fi
+done
+
+print_success "Shell, tmux and Neovim configuration linked"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 5: Link Neovim configuration
+# Step 5: Claude Code and Codex configuration
 # -----------------------------------------------------------------------------
 
-print_info "[5/9] Installing Neovim configuration..."
-
-# Create .config directory if it doesn't exist
-mkdir -p "$HOME/.config"
-
-# Backup and remove existing Neovim config
-NVIM_CONFIG="$HOME/.config/nvim"
-if [ -d "$NVIM_CONFIG" ] || [ -L "$NVIM_CONFIG" ]; then
-    backup="$NVIM_CONFIG.backup-$(date +%Y%m%d-%H%M%S)"
-    print_warning "Backing up existing Neovim config to:"
-    print_warning "  $backup"
-    mv "$NVIM_CONFIG" "$backup"
-fi
-
-# Create symlink
-if ln -sf "$DOTFILES_DIR/nvim" "$NVIM_CONFIG"; then
-    print_success "Neovim configuration symlinked to:"
-    print_success "  $NVIM_CONFIG"
-else
-    print_error "Failed to symlink Neovim configuration"
-fi
-echo ""
-
-# -----------------------------------------------------------------------------
-# Step 6: Set file permissions
-# -----------------------------------------------------------------------------
-
-print_info "[6/9] Installing Claude Code and Codex configuration..."
+print_info "[5/8] Installing Claude Code and Codex configuration..."
 CLAUDE_CONFIG_DIR="$HOME/.claude"
 CODEX_CONFIG_DIR="${CODEX_HOME:-$HOME/.codex}"
 if ! command -v node &> /dev/null; then
@@ -171,9 +182,27 @@ fi
 # Agent sync backs up changed managed files and retains unrelated settings.
 node "$DOTFILES_DIR/scripts/sync-agent-config.mjs" --repo "$DOTFILES_DIR" --home "$HOME"
 
-# Install global git ignore. Git reads ~/.config/git/ignore when
-# core.excludesFile is unset. It keeps LESSONS.md, written by the Claude Code
-# lessons hook, out of every repository unless a project opts in.
+# hunk ships a review skill for Claude Code. Link it, so it follows hunk
+# updates without another sync.
+if command -v hunk &> /dev/null; then
+    HUNK_SKILL="$(hunk skill path hunk-review 2>/dev/null || true)"
+    HUNK_LINK="$CLAUDE_CONFIG_DIR/skills/hunk-review"
+    if [ -n "$HUNK_SKILL" ] && { [ ! -e "$HUNK_LINK" ] || [ -L "$HUNK_LINK" ]; }; then
+        mkdir -p "$CLAUDE_CONFIG_DIR/skills"
+        ln -sfn "$(dirname "$HUNK_SKILL")" "$HUNK_LINK"
+        print_success "Linked the hunk-review skill to $HUNK_LINK"
+    fi
+fi
+echo ""
+
+# -----------------------------------------------------------------------------
+# Step 6: Global git ignore
+# -----------------------------------------------------------------------------
+
+print_info "[6/8] Installing the global git ignore..."
+# Git reads ~/.config/git/ignore when core.excludesFile is unset. It keeps
+# LESSONS.md, written by the Claude Code lessons hook, out of every
+# repository unless a project opts in.
 GIT_IGNORE_SOURCE="$DOTFILES_DIR/git/ignore"
 GIT_IGNORE_TARGET="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
 GIT_EXCLUDES_FILE="$(git config --global --get core.excludesFile 2>/dev/null || true)"
@@ -199,37 +228,20 @@ else
     print_success "Global git ignore installed to:"
     print_success "  $GIT_IGNORE_TARGET"
 fi
-
-print_success "Claude Code and Codex configuration installed"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 7: Set file permissions
+# Step 7: Verify installation
 # -----------------------------------------------------------------------------
 
-print_info "[7/9] Setting file permissions..."
-
-chmod 644 "$HOME/.bashrc" 2>/dev/null || true
-chmod 644 "$HOME/.bash_aliases" 2>/dev/null || true
-chmod 644 "$HOME/.zshrc" 2>/dev/null || true
-chmod 644 "$HOME/.profile" 2>/dev/null || true
-
-print_success "File permissions set"
-echo ""
-
-# -----------------------------------------------------------------------------
-# Step 8: Verify installation
-# -----------------------------------------------------------------------------
-
-print_info "[8/9] Verifying installation..."
+print_info "[7/8] Verifying installation..."
 ISSUES=()
 
-[ ! -f "$HOME/.bashrc" ] && ISSUES+=("~/.bashrc not found")
-[ ! -f "$HOME/.bash_aliases" ] && ISSUES+=("~/.bash_aliases not found")
-[ ! -f "$HOME/.zshrc" ] && ISSUES+=("~/.zshrc not found")
-[ ! -f "$HOME/.profile" ] && ISSUES+=("~/.profile not found")
-[ ! -d "$NVIM_CONFIG" ] && ISSUES+=("Neovim config not found at $NVIM_CONFIG")
-[ ! -f "$HOME/.tmux.conf" ] && ISSUES+=("~/.tmux.conf not found")
+for file in .zshrc .zprofile .bashrc .profile .tmux.conf; do
+    [ ! -f "$HOME/$file" ] && ISSUES+=("~/$file not found")
+done
+[ ! -d "$HOME/.config/nvim" ] && ISSUES+=("Neovim config not found at ~/.config/nvim")
+[ ! -f "$HOME/.oh-my-zsh/oh-my-zsh.sh" ] && ISSUES+=("oh-my-zsh not found at ~/.oh-my-zsh")
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
 [ ! -f "$CLAUDE_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Claude instructions not found at $CLAUDE_CONFIG_DIR/AGENTS.md")
 [ ! -f "$CODEX_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Codex instructions not found at $CODEX_CONFIG_DIR/AGENTS.md")
@@ -248,38 +260,42 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 9: Next steps
+# Step 8: Tools and next steps
 # -----------------------------------------------------------------------------
 
-print_info "[9/9] Installation complete!"
-echo ""
-print_success "============================================================================"
-print_success "Dotfiles installed successfully!"
-print_success "============================================================================"
-echo ""
-print_info "Next steps:"
-echo "  1. Restart your shell or run: source ~/.bashrc"
-echo "  2. Test aliases: ll, gs, dots, etc."
-echo "  3. Try navigating with: dots"
-echo ""
-
-if command -v nvim &> /dev/null; then
-    print_info "Neovim detected! Test with: nvim"
-else
-    print_warning "Neovim not found. Install it to use the Neovim configuration:"
-    if [ "$IS_WSL" = true ] || command -v apt &> /dev/null; then
-        print_warning "  sudo apt update && sudo apt install neovim"
+print_info "[8/8] Checking tools..."
+if [ "$OS" = macos ]; then
+    if ! command -v brew &> /dev/null; then
+        print_warning "Homebrew not found. Install it from https://brew.sh, then run:"
+        print_warning "  brew bundle --file $DOTFILES_DIR/Brewfile"
+    elif brew bundle check --file "$DOTFILES_DIR/Brewfile" &> /dev/null; then
+        print_success "Everything in the Brewfile is installed"
     else
-        print_warning "  See: https://neovim.io/"
+        print_warning "Some tools in the Brewfile are missing. Install them with:"
+        print_warning "  brew bundle --file $DOTFILES_DIR/Brewfile"
+    fi
+else
+    MISSING=()
+    for tool in zsh tmux nvim rg git node; do
+        command -v "$tool" &> /dev/null || MISSING+=("$tool")
+    done
+    if [ ${#MISSING[@]} -eq 0 ]; then
+        print_success "zsh, tmux, Neovim, ripgrep, git and Node.js are installed"
+    else
+        print_warning "Missing: ${MISSING[*]}. On Ubuntu:"
+        print_warning "  sudo apt update && sudo apt install zsh tmux neovim ripgrep fd-find git nodejs"
+    fi
+    if [ "$(basename "${SHELL:-}")" != zsh ] && command -v zsh &> /dev/null; then
+        print_warning "Your login shell is ${SHELL:-unknown}. Switch to zsh with:"
+        print_warning "  chsh -s $(command -v zsh)"
     fi
 fi
-
-if ! command -v tmux &> /dev/null; then
-    print_warning "tmux not found. Install it to use the tmux configuration:"
-    print_warning "  sudo apt update && sudo apt install tmux"
-fi
-
 echo ""
-print_info "For more information, visit:"
-print_info "  https://github.com/romaklimenko/dotfiles"
+
+print_success "============================================================================"
+print_success "Dotfiles installed. Open a new terminal, or run: exec zsh"
+print_success "============================================================================"
+echo ""
+print_info "Try: ws (tmux session per workspace in ~/Work), dots, gst, glog"
+print_info "More: https://github.com/romaklimenko/dotfiles"
 echo ""

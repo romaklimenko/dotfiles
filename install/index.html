@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Cross-platform dotfiles for Windows and Ubuntu by Roman Klimenko">
+    <meta name="description" content="Dotfiles for macOS and Ubuntu by Roman Klimenko">
     <meta name="author" content="Roman Klimenko">
     <title>dotfiles.klimenko.dk - Dotfiles</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -710,7 +710,7 @@
         <nav class="nav-links">
             <a href="#quick-installation"><span class="nav-icon" aria-hidden="true">&#9889;</span>Quick install</a>
             <a href="#whats-included"><span class="nav-icon" aria-hidden="true">&#128230;</span>What's included</a>
-            <a href="#powershell-reference"><span class="nav-icon" aria-hidden="true">&#9000;</span>PowerShell reference</a>
+            <a href="#shell-reference"><span class="nav-icon" aria-hidden="true">&#9000;</span>Shell reference</a>
             <a href="#updating"><span class="nav-icon" aria-hidden="true">&#128260;</span>Updating</a>
         </nav>
         <div class="connect">
@@ -742,15 +742,15 @@
         <div class="sidebar-block">
             <h2 class="section-heading">About</h2>
             <p class="sidebar-bio">
-                Cross-platform shell, editor and tooling configuration for Windows and
-                Ubuntu, by Roman Klimenko. <span aria-hidden="true">&#127465;&#127472;</span>
+                Shell, editor and tooling configuration for macOS and Ubuntu,
+                by Roman Klimenko. <span aria-hidden="true">&#127465;&#127472;</span>
             </p>
         </div>
 
         <nav class="nav-links">
             <a href="#quick-installation"><span class="nav-icon" aria-hidden="true">&#9889;</span>Quick install</a>
             <a href="#whats-included"><span class="nav-icon" aria-hidden="true">&#128230;</span>What's included</a>
-            <a href="#powershell-reference"><span class="nav-icon" aria-hidden="true">&#9000;</span>PowerShell reference</a>
+            <a href="#shell-reference"><span class="nav-icon" aria-hidden="true">&#9000;</span>Shell reference</a>
             <a href="#updating"><span class="nav-icon" aria-hidden="true">&#128260;</span>Updating</a>
         </nav>
 
@@ -771,7 +771,7 @@
         <main id="top">
             <div class="content">
                 <h1>dotfiles</h1>
-                <p class="subtitle">Cross-platform configuration for Windows and Ubuntu</p>
+                <p class="subtitle">Configuration for macOS and Ubuntu</p>
 
                 <div class="actions">
                     <a href="https://github.com/romaklimenko/dotfiles" class="button">View on GitHub</a>
@@ -784,13 +784,11 @@
 
                 <h2 id="quick-installation">Quick Installation</h2>
                 <!-- generated:start:quick-start -->
-<h3>Windows (PowerShell)</h3>
-
-<pre><code>irm dotfiles.klimenko.dk/install.ps1 | iex</code></pre>
-
-<h3>Linux / WSL</h3>
+<h3>macOS and Ubuntu</h3>
 
 <pre><code>curl -fsSL dotfiles.klimenko.dk/install.sh | bash</code></pre>
+
+<p>The installer clones the repository to <code>~/Work/dotfiles</code>. On a new Mac, install the tools afterwards with <code>brew bundle --file ~/Work/dotfiles/Brewfile</code>.</p>
 
 <p><strong>Security Note:</strong> Always review scripts before running them. View the source at <a href="https://github.com/romaklimenko/dotfiles">github.com/romaklimenko/dotfiles</a>.</p>
 <!-- generated:end:quick-start -->
@@ -799,35 +797,24 @@
                 <!-- generated:start:features -->
 <div class="features">
 <div class="feature">
-  <h4>PowerShell Profile</h4>
-  <p>Custom Windows PowerShell configuration with:</p>
+  <h4>Zsh with oh-my-zsh</h4>
+  <p>One shell setup for macOS and Ubuntu:</p>
 <ul>
-    <li><code>$env:DEV_HOME</code> and <code>$env:DOTFILES_HOME</code> instead of overriding <code>$env:HOME</code></li>
-    <li>Useful aliases and functions</li>
-    <li>Git shortcuts</li>
-    <li>WSL integration helpers</li>
-    <li>herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on <code>prefix+d</code>, toggles a Neovim sidebar on <code>prefix+e</code>, and opens a command bar that jumps to any tab, pane or agent on <code>prefix+space</code></li>
-  </ul>
-</div>
-
-<div class="feature">
-  <h4>Bash/Zsh Configuration</h4>
-  <p>Linux shell setup with:</p>
-<ul>
-    <li>Enhanced aliases</li>
-    <li>Improved history management</li>
-    <li>Git shortcuts</li>
-    <li>WSL detection and configuration</li>
+    <li><code>DEV_HOME</code> (<code>~/Work</code>, one folder per workspace) and <code>DOTFILES_HOME</code> instead of overriding <code>HOME</code></li>
+    <li>The standard oh-my-zsh aliases for git, ls and archives, plus Databricks shortcuts</li>
+    <li>Homebrew, cargo and <code>~/.local/bin</code> first on <code>PATH</code>, in login shells too</li>
+    <li>Tokens kept in the macOS Keychain and exported at shell start, never written to a file</li>
   </ul>
 </div>
 
 <div class="feature">
   <h4>tmux Configuration</h4>
-  <p>One config for tmux on Ubuntu and psmux on Windows, made for running several coding agents:</p>
+  <p>Made for running several coding agents side by side:</p>
 <ul>
-    <li>Ctrl+Space prefix, one session per project opened with <code>ws</code>, one window per agent</li>
-    <li>Windows and panes named after the agent's session, or after the folder at a shell prompt</li>
-    <li>Ctrl+Space, <code>w</code> lists every project and agent, so you can switch between them</li>
+    <li>Ctrl+Space prefix, one session per workspace opened with <code>ws</code>, one window per agent</li>
+    <li>tmux windows and panes named after the agent's session, or after the folder at a shell prompt</li>
+    <li>Ctrl+Space, <code>w</code> lists every workspace and agent, so you can switch between them</li>
+    <li>Copied text goes to the system clipboard</li>
   </ul>
 </div>
 
@@ -836,7 +823,7 @@
   <p>VS Code-style editing shortcuts, multicursors, Telescope file tabs, and Git previews with Danish-keyboard alternatives (from <a href="https://github.com/romaklimenko/nvim">romaklimenko/nvim</a>)</p>
 <ul>
     <li>Integrated as git submodule</li>
-    <li>Shared across Windows and Linux</li>
+    <li>Shared across macOS and Linux</li>
   </ul>
 </div>
 
@@ -856,54 +843,57 @@
   <h4>Automated Installation</h4>
   <p>One-line setup for new machines via <a href="https://dotfiles.klimenko.dk">dotfiles.klimenko.dk</a></p>
 <ul>
+    <li>A Brewfile with the command-line tools for the Mac</li>
     <li>Landing page with light and dark themes, matching the design of <a href="https://klimenko.dk">klimenko.dk</a></li>
   </ul>
 </div>
 </div>
 <!-- generated:end:features -->
 
-                <h2 id="powershell-reference">PowerShell Profile Reference</h2>
-                <!-- generated:start:powershell-reference -->
+                <h2 id="shell-reference">Shell Reference</h2>
+                <!-- generated:start:shell-reference -->
 <h3>Personal roots</h3>
 <ul>
-    <li><code>$env:DEV_HOME</code> is <code>C:\home</code> and <code>$env:DOTFILES_HOME</code> is <code>C:\home\dotfiles</code>. <code>$env:HOME</code> is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile</li>
+    <li><code>DEV_HOME</code> is <code>~/Work</code> and <code>DOTFILES_HOME</code> is <code>~/Work/dotfiles</code>. <code>HOME</code> is left alone, because git, ssh and most other tools read it</li>
 </ul>
 
 <h3>Editor</h3>
 <ul>
-    <li><code>$env:EDITOR</code> is <code>vim</code>. In PowerShell <code>vim</code> is an alias for Neovim. Tools that spawn the editor directly, such as hunk, resolve <code>vim</code> to <code>windows/bin/vim.cmd</code>, a shim installed to <code>C:\home\.local\bin</code> that runs Neovim. When hunk launches it inside a herdr pane, the shim opens Neovim in a new herdr pane and waits for it, because hunk's suspended terminal never forwards keystrokes on Windows. Git still finds Vim from Git for Windows first</li>
+    <li><code>EDITOR</code> and <code>VISUAL</code> are <code>nvim</code>. <code>vim</code> and <code>vi</code> open Neovim</li>
 </ul>
 
-<h3>Aliases</h3>
+<h3>oh-my-zsh</h3>
 <ul>
-    <li><code>ll</code>, <code>la</code> - List files</li>
-    <li><code>vim</code>, <code>vi</code> - Opens Neovim (if installed)</li>
+    <li>robbyrussell theme with the <code>git</code>, <code>common-aliases</code>, <code>extract</code>, <code>gh</code>, <code>uv</code>, <code>rust</code>, <code>npm</code>, <code>python</code> and <code>codex</code> plugins, plus <code>macos</code> and <code>brew</code> on macOS or <code>ubuntu</code> on Ubuntu. bash gets the same alias names from <code>shell/.bash_aliases</code>. <code>rm</code>, <code>cp</code> and <code>mv</code> don't ask before they act, because coding agents run commands with these aliases and can't answer</li>
+</ul>
+
+<h3>Git Shortcuts (oh-my-zsh)</h3>
+<ul>
+    <li><code>gst</code> - git status</li>
+    <li><code>ga</code>, <code>gaa</code> - git add, git add --all</li>
+    <li><code>gc</code> - git commit --verbose. <code>gcmsg "message"</code> commits with a message</li>
+    <li><code>gp</code> - git push</li>
+    <li><code>gl</code> - git pull</li>
+    <li><code>gf</code> - git fetch</li>
+    <li><code>gd</code>, <code>gds</code> - git diff, git diff --staged</li>
+    <li><code>gco</code>, <code>gsw</code>, <code>gb</code>, <code>gba</code>, <code>gm</code> - git checkout, switch, branch, branch --all, merge</li>
+    <li><code>grv</code> - git remote --verbose</li>
+    <li><code>glog</code> - git log as a graph, one line per commit. <code>glol</code> adds dates and authors</li>
 </ul>
 
 <h3>Navigation Shortcuts</h3>
 <ul>
-    <li><code>cdh</code>, <code>hh</code> - Go to <code>$env:DEV_HOME</code></li>
-    <li><code>dots</code> - Go to <code>$env:DOTFILES_HOME</code></li>
+    <li><code>cdh</code>, <code>hh</code> - Go to <code>$DEV_HOME</code></li>
+    <li><code>dots</code> - Go to <code>$DOTFILES_HOME</code></li>
     <li><code>..</code>, <code>...</code>, <code>....</code> - Go up 1, 2, or 3 directories</li>
-</ul>
-
-<h3>Git Shortcuts</h3>
-<ul>
-    <li><code>gs</code> - git status</li>
-    <li><code>ga</code> - git add</li>
-    <li><code>gc</code> - git commit</li>
-    <li><code>gpsh</code> - git push</li>
-    <li><code>gl</code> - git log (oneline, graph, decorate)</li>
-    <li><code>gd</code> - git diff</li>
-    <li><code>gco</code> - git checkout</li>
-    <li><code>gb</code> - git branch</li>
-    <li><code>gpll</code> - git pull</li>
+    <li><code>mkcd</code>, <code>take</code> - Create a directory and go into it</li>
+    <li><code>ll</code>, <code>la</code>, <code>lt</code> - List files: long, with hidden files, newest first</li>
 </ul>
 
 <h3>Databricks Shortcuts</h3>
 <ul>
-    <li><code>dbcfg</code> - Open <code>.databrickscfg</code> in editor</li>
-    <li><code>d</code> - databricks</li>
+    <li><code>dbcfg</code> - Open <code>~/.databrickscfg</code> in the editor</li>
+    <li><code>d</code> - databricks. It replaces oh-my-zsh's <code>d</code>, which lists the directory stack</li>
     <li><code>db</code> - databricks bundle</li>
     <li><code>dbd</code> - databricks bundle deploy</li>
     <li><code>dbv</code> - databricks bundle validate</li>
@@ -915,15 +905,9 @@
     <li><code>dfs</code> - databricks fs</li>
 </ul>
 
-<h3>WSL Integration</h3>
-<ul>
-    <li><code>ubuntu</code> - Launch WSL Ubuntu</li>
-    <li><code>wslh</code> - Open WSL in home directory</li>
-</ul>
-
 <h3>tmux</h3>
 <ul>
-    <li><code>ws</code> - Open a project folder as a tmux session. <code>ws webshop</code> opens <code>C:\home\webshop</code></li>
+    <li><code>ws</code> - Open a workspace as a tmux session. <code>ws backstage</code> opens <code>~/Work/backstage</code>, and Tab completes workspace names</li>
 </ul>
 
 <h3>Dotfiles Management</h3>
@@ -932,20 +916,20 @@
     <li><code>dotpull</code> - Pull latest from remote repo and apply</li>
 </ul>
 
+<h3>Secrets (macOS)</h3>
+<ul>
+    <li><code>keychain-set NAME</code> - Store one line from stdin in the login Keychain</li>
+    <li><code>keychain-env NAME...</code> - Export stored values as environment variables, from <code>~/.zshrc.local</code></li>
+</ul>
+
 <h3>Utility Functions</h3>
 <ul>
-    <li><code>pp</code> - Reload PowerShell profile</li>
-    <li><code>which</code> - Find command location</li>
-    <li><code>touch</code> - Create or update file timestamp</li>
-    <li><code>grep</code> - Search text with patterns</li>
-    <li><code>lsa</code> - List all files (including hidden)</li>
-    <li><code>du</code> - Show directory size</li>
-    <li><code>mkcd</code> - Create directory and cd into it</li>
-    <li><code>myip</code> - Show external IPv4 address</li>
-    <li><code>myip6</code> - Show external IPv6 address</li>
-    <li><code>explore</code> - Open directory in Windows Explorer</li>
+    <li><code>extract</code>, <code>x</code> - Unpack an archive of any common type</li>
+    <li><code>myip</code>, <code>myip6</code> - Show external IPv4 or IPv6 address</li>
+    <li><code>ofd</code> - Open the current folder in Finder (macOS)</li>
+    <li><code>omz reload</code> - Reload zsh after a configuration change</li>
 </ul>
-<!-- generated:end:powershell-reference -->
+<!-- generated:end:shell-reference -->
 
                 <h2 id="manual-installation">Manual Installation</h2>
 
@@ -953,17 +937,9 @@
 
                 <h2 id="updating">Updating</h2>
 
-                <p>To update your dotfiles to the latest version:</p>
+                <p>To update your dotfiles to the latest version, run <code>dotpull</code> in a shell. It pulls the repository and applies it. <code>dotsync</code> applies local changes without pulling.</p>
 
-                <h3>Windows</h3>
-                <pre><code>cd C:\home\dotfiles
-git pull
-git submodule update --remote</code></pre>
-
-                <h3>Linux / WSL</h3>
-                <pre><code>cd ~/dotfiles
-git pull
-git submodule update --remote</code></pre>
+                <pre><code>dotpull</code></pre>
 
                 <h2 id="support">Support</h2>
 

@@ -67,7 +67,7 @@
   },
   "enabledPlugins": {
     "vercel-plugin@vercel": true,
-    "caveman@caveman": true
+    "caveman@caveman": false
   },
   "extraKnownMarketplaces": {
     "caveman": {

@@ -25,13 +25,13 @@ const indexHtml = fs.readFileSync(indexPath, "utf8");
 const blocks = {
   "quick-start": extractMarkedBlock(readme, "quick-start"),
   features: extractMarkedBlock(readme, "features"),
-  "powershell-reference": extractMarkedBlock(readme, "powershell-reference"),
+  "shell-reference": extractMarkedBlock(readme, "shell-reference"),
 };
 
 const rendered = {
   "quick-start": renderQuickStart(blocks["quick-start"]),
   features: renderFeatures(blocks.features),
-  "powershell-reference": renderPowerShellReference(blocks["powershell-reference"]),
+  "shell-reference": renderShellReference(blocks["shell-reference"]),
 };
 
 let nextHtml = indexHtml;
@@ -197,7 +197,7 @@ ${cardsHtml}
 </div>`;
 }
 
-function renderPowerShellReference(markdown) {
+function renderShellReference(markdown) {
   const lines = markdown.split(/\r?\n/);
   const groups = [];
   let current = null;
@@ -231,7 +231,7 @@ function renderPowerShellReference(markdown) {
   if (current) groups.push(current);
 
   if (groups.length === 0) {
-    throw new Error("No PowerShell reference groups parsed from README markers");
+    throw new Error("No shell reference groups parsed from README markers");
   }
 
   return groups

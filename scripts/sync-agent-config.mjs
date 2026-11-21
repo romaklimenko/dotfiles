@@ -101,7 +101,7 @@ function sourceFiles(directory) {
   return result;
 }
 
-export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME || join(home, ".codex"), platform = process.platform }) {
+export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME || join(home, ".codex") }) {
   const repoRoot = resolve(repo);
   const userRoot = resolve(home);
   const codexRoot = resolve(codexHome);
@@ -138,45 +138,6 @@ export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME
     for (const file of sourceFiles(source)) plan(join(target, relative(source, file)), readFileSync(file), userRoot);
   }
 
-  // Resolve plugin paths in Python so Windows hooks work in PowerShell and cmd.
-  // Repair only known Databricks commands and our previous cmd-only overrides.
-  const repairedHooks = [];
-  if (platform === "win32") {
-    const plugin = join(codexRoot, "plugins", "cache", "databricks-agent-skills", "databricks");
-    validateParents(join(plugin, "hooks.json"), codexRoot);
-    const versions = existsSync(plugin) ? readdirSync(plugin, { withFileTypes: true }) : [];
-    const scripts = ["databricks-router.py", "databricks-context.py", "databricks-auth-helper.py"];
-    for (const version of versions.filter((entry) => entry.isDirectory())) {
-      const file = join(plugin, version.name, "hooks", "hooks.json");
-      validateParents(file, codexRoot);
-      if (!existsSync(file)) continue;
-      const value = jsonFile(file);
-      let modified = false;
-      for (const groups of Object.values(value.hooks ?? {})) {
-        if (!Array.isArray(groups)) continue;
-        for (const group of groups) {
-          for (const hook of group.hooks ?? []) {
-            if (hook.type !== "command" || Object.hasOwn(hook, "command_windows")) continue;
-            const script = scripts.find((name) => {
-              const path = `"\${PLUGIN_ROOT:-\${CLAUDE_PLUGIN_ROOT}}/hooks/${name}"`;
-              return hook.command === `python3 ${path} || python ${path} || true`;
-            });
-            if (!script) continue;
-            const previousOverride = `python "%PLUGIN_ROOT%/hooks/${script}"`;
-            if (Object.hasOwn(hook, "commandWindows") && hook.commandWindows !== previousOverride) continue;
-            hook.commandWindows = `python -c "import os, runpy; runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'], 'hooks', '${script}'), run_name='__main__')"`;
-            modified = true;
-          }
-        }
-      }
-      if (modified) {
-        const newline = readFileSync(file, "utf8").includes("\r\n") ? "\r\n" : "\n";
-        plan(file, Buffer.from(`${JSON.stringify(value, null, 2)}\n`.replace(/\n/g, newline)), codexRoot);
-        repairedHooks.push(file);
-      }
-    }
-  }
-
   const backups = [];
   const changed = [];
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -192,7 +153,7 @@ export function syncAgentConfig({ repo, home, codexHome = process.env.CODEX_HOME
     renameSync(temporary, file);
     changed.push(file);
   }
-  return { changed, backups, unchanged, repairedHooks };
+  return { changed, backups, unchanged };
 }
 
 function main(argv) {
@@ -209,7 +170,6 @@ function main(argv) {
   if (!options.repo || !options.home) throw new Error("Both --repo and --home are required");
   const result = syncAgentConfig(options);
   console.log(`Agent configuration: ${result.changed.length} files updated, ${result.backups.length} backups, ${result.unchanged} unchanged.`);
-  if (result.repairedHooks.length) console.log("Updated Databricks Windows hooks. Open /hooks in Codex to review and trust the changed commands.");
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

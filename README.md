@@ -1,31 +1,25 @@
 # dotfiles
 
-Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by Roman Klimenko ([@romaklimenko](https://github.com/romaklimenko)).
+Dotfiles for macOS and Ubuntu by Roman Klimenko ([@romaklimenko](https://github.com/romaklimenko)).
 
 ## Features
 
 <!-- sync:features:start -->
-- **PowerShell Profile:** Custom Windows PowerShell configuration with:
-  - `$env:DEV_HOME` and `$env:DOTFILES_HOME` instead of overriding `$env:HOME`
-  - Useful aliases and functions
-  - Git shortcuts
-  - WSL integration helpers
-  - herdr config that opens PowerShell 7 in new panes, reviews the working tree in hunk on `prefix+d`, toggles a Neovim sidebar on `prefix+e`, and opens a command bar that jumps to any tab, pane or agent on `prefix+space`
+- **Zsh with oh-my-zsh:** One shell setup for macOS and Ubuntu:
+  - `DEV_HOME` (`~/Work`, one folder per workspace) and `DOTFILES_HOME` instead of overriding `HOME`
+  - The standard oh-my-zsh aliases for git, ls and archives, plus Databricks shortcuts
+  - Homebrew, cargo and `~/.local/bin` first on `PATH`, in login shells too
+  - Tokens kept in the macOS Keychain and exported at shell start, never written to a file
 
-- **Bash/Zsh Configuration:** Linux shell setup with:
-  - Enhanced aliases
-  - Improved history management
-  - Git shortcuts
-  - WSL detection and configuration
-
-- **tmux Configuration:** One config for tmux on Ubuntu and psmux on Windows, made for running several coding agents:
-  - Ctrl+Space prefix, one session per project opened with `ws`, one window per agent
-  - Windows and panes named after the agent's session, or after the folder at a shell prompt
-  - Ctrl+Space, `w` lists every project and agent, so you can switch between them
+- **tmux Configuration:** Made for running several coding agents side by side:
+  - Ctrl+Space prefix, one session per workspace opened with `ws`, one window per agent
+  - tmux windows and panes named after the agent's session, or after the folder at a shell prompt
+  - Ctrl+Space, `w` lists every workspace and agent, so you can switch between them
+  - Copied text goes to the system clipboard
 
 - **Neovim Configuration:** VS Code-style editing shortcuts, multicursors, Telescope file tabs, and Git previews with Danish-keyboard alternatives (from [romaklimenko/nvim](https://github.com/romaklimenko/nvim))
   - Integrated as git submodule
-  - Shared across Windows and Linux
+  - Shared across macOS and Linux
 
 - **Claude Code and Codex Configuration:** One maintained instruction source for both agents
   - Shared `AGENTS.md`, with a one-line Claude include
@@ -35,131 +29,77 @@ Cross-platform dotfiles configuration for Windows and Ubuntu (WSL/standalone) by
   - hunk's bundled review skill linked for Claude Code, so it can annotate a live hunk diff
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
+  - A Brewfile with the command-line tools for the Mac
   - Landing page with light and dark themes, matching the design of [klimenko.dk](https://klimenko.dk)
 <!-- sync:features:end -->
 
 ## Quick Start
 
 <!-- sync:quick-start:start -->
-### Windows (PowerShell)
-
-```powershell
-irm dotfiles.klimenko.dk/install.ps1 | iex
-```
-
-### Linux / WSL
+### macOS and Ubuntu
 
 ```bash
 curl -fsSL dotfiles.klimenko.dk/install.sh | bash
 ```
+
+The installer clones the repository to `~/Work/dotfiles`. On a new Mac, install the tools afterwards with `brew bundle --file ~/Work/dotfiles/Brewfile`.
 
 **Security Note:** Always review scripts before running them. View the source at [github.com/romaklimenko/dotfiles](https://github.com/romaklimenko/dotfiles).
 <!-- sync:quick-start:end -->
 
 ## Manual Installation
 
-### Windows
-
-1. Clone the repository:
-```powershell
-git clone https://github.com/romaklimenko/dotfiles.git C:\home\dotfiles
-cd C:\home\dotfiles
-```
-
-2. Initialize Neovim submodule:
-```powershell
-git submodule init
-git submodule update --remote
-```
-
-3. Link PowerShell profile:
-```powershell
-Copy-Item .\windows\Microsoft.PowerShell_profile.ps1 $PROFILE -Force
-```
-
-4. Link Neovim config (requires admin or Developer Mode):
-```powershell
-New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\nvim" -Target "C:\home\dotfiles\nvim" -Force
-```
-
-5. Install the herdr config, if herdr is installed. It opens PowerShell 7 in new panes so the profile loads, binds `prefix+d` to `hunk diff --watch`, binds `prefix+e` and `prefix+o` to the herdr-nvim plugin, and binds `prefix+space` to the herdr-bar command bar:
-```powershell
-herdr plugin install ChmaraX/herdr-nvim
-$modulePath = $env:PSModulePath; $env:PSModulePath = $null; herdr plugin install jeffarese/herdr-bar; $env:PSModulePath = $modulePath
-New-Item -ItemType Directory -Path "$env:APPDATA\herdr" -Force
-Copy-Item .\windows\herdr\config.toml "$env:APPDATA\herdr\config.toml" -Force
-Copy-Item .\windows\herdr\plugins\herdr-bar\config.json "$(herdr plugin config-dir herdr-bar)\config.json" -Force
-herdr server reload-config
-```
-
-6. Install the tmux config. On Windows the `tmux` command is psmux:
-```powershell
-winget install marlocarlo.psmux
-Copy-Item .\tmux\tmux.conf "$env:USERPROFILE\.tmux.conf" -Force
-Copy-Item .\windows\psmux\psmux.conf "$env:USERPROFILE\.psmux.conf" -Force
-```
-
-7. Install shared agent configuration and the global git ignore (Node.js 20+):
-```powershell
-node .\scripts\sync-agent-config.mjs --repo . --home $env:USERPROFILE
-New-Item -ItemType Directory -Path "$env:USERPROFILE/.config/git" -Force
-$globalIgnore = "$env:USERPROFILE/.config/git/ignore"
-foreach ($pattern in Get-Content .\git\ignore) {
-    if (-not (Test-Path $globalIgnore) -or $pattern -notin @(Get-Content $globalIgnore)) {
-        Add-Content -LiteralPath $globalIgnore -Value $pattern
-    }
-}
-```
-If hunk is installed, link its bundled review skill for Claude Code:
-```powershell
-New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\hunk-review" -Target (Split-Path (hunk skill path hunk-review))
-```
-
-8. Reload profile:
-```powershell
-. $PROFILE
-```
-
-### Linux / WSL
-
-1. Clone the repository:
+1. Clone the repository with the Neovim submodule:
 ```bash
-git clone https://github.com/romaklimenko/dotfiles.git ~/dotfiles
-cd ~/dotfiles
+git clone --recurse-submodules https://github.com/romaklimenko/dotfiles.git ~/Work/dotfiles
+cd ~/Work/dotfiles
 ```
 
-2. Initialize Neovim submodule:
+2. Install the tools. On macOS, with [Homebrew](https://brew.sh):
 ```bash
-git submodule init
-git submodule update --remote
+brew bundle --file Brewfile
+```
+On Ubuntu:
+```bash
+sudo apt update && sudo apt install zsh tmux neovim ripgrep fd-find git nodejs
+chsh -s "$(command -v zsh)"
 ```
 
-3. Link dotfiles:
+3. Install oh-my-zsh, if it isn't there yet:
 ```bash
-ln -sf ~/dotfiles/linux/.bashrc ~/.bashrc
-ln -sf ~/dotfiles/linux/.bash_aliases ~/.bash_aliases
-ln -sf ~/dotfiles/linux/.zshrc ~/.zshrc
-ln -sf ~/dotfiles/linux/.profile ~/.profile
-mkdir -p ~/.config
-ln -sf ~/dotfiles/nvim ~/.config/nvim
-ln -sf ~/dotfiles/tmux/tmux.conf ~/.tmux.conf
+git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh
 ```
-The tmux config needs tmux: `sudo apt install tmux`.
 
-4. Install shared agent configuration and the global git ignore (Node.js 20+):
+4. Link the configuration files. `ln -s` refuses to replace a file, so move existing ones out of the way first:
 ```bash
-node ~/dotfiles/scripts/sync-agent-config.mjs --repo ~/dotfiles --home "$HOME"
+ln -s ~/Work/dotfiles/shell/.zshrc ~/.zshrc
+ln -s ~/Work/dotfiles/shell/.zprofile ~/.zprofile
+ln -s ~/Work/dotfiles/shell/.bashrc ~/.bashrc
+ln -s ~/Work/dotfiles/shell/.profile ~/.profile
+ln -s ~/Work/dotfiles/tmux/tmux.conf ~/.tmux.conf
+mkdir -p ~/.config && ln -s ~/Work/dotfiles/nvim ~/.config/nvim
+```
+
+5. Install shared agent configuration and the global git ignore (Node.js 20+):
+```bash
+node ~/Work/dotfiles/scripts/sync-agent-config.mjs --repo ~/Work/dotfiles --home "$HOME"
 mkdir -p ~/.config/git
 touch ~/.config/git/ignore
 while IFS= read -r pattern || [ -n "$pattern" ]; do
     grep -Fxq -- "$pattern" ~/.config/git/ignore || printf '\n%s\n' "$pattern" >> ~/.config/git/ignore
-done < ~/dotfiles/git/ignore
+done < ~/Work/dotfiles/git/ignore
+```
+If hunk is installed (`npm install -g hunkdiff`), link its review skill for Claude Code:
+```bash
+mkdir -p ~/.claude/skills
+ln -s "$(dirname "$(hunk skill path hunk-review)")" ~/.claude/skills/hunk-review
 ```
 
-5. Reload shell:
-```bash
-source ~/.bashrc
-```
+6. Open a new terminal, or run `exec zsh`.
+
+`bash install/install.sh --local` does steps 3 to 5 in one go, and backs up the files it replaces.
+
+To keep your workspaces somewhere other than `~/Work`, set `DEV_HOME` in `~/.zshenv` before you run the installer. The repository then goes to `$DEV_HOME/dotfiles`.
 
 ## Repository Structure
 
@@ -170,6 +110,7 @@ dotfiles/
 │       └── pages.yml # GitHub Pages deployment
 ├── AGENTS.md         # Repository development instructions
 ├── CLAUDE.md         # One-line @AGENTS.md include
+├── Brewfile          # Command-line tools for the Mac (brew bundle)
 ├── agents/
 │   └── AGENTS.md     # Global instructions installed for Claude and Codex
 ├── claude/           # Claude settings and shared lessons tools
@@ -179,28 +120,22 @@ dotfiles/
 │   └── hooks/        # Shared reader/writer plus Claude extraction and compaction
 ├── git/
 │   └── ignore        # Global git ignore, installed to ~/.config/git/ignore
+├── install/          # Installation script and GitHub Pages
+│   ├── install.sh    # macOS and Ubuntu installer
+│   └── index.html    # Landing page
+├── nvim/             # Neovim config (git submodule), linked to ~/.config/nvim
 ├── scripts/          # Shared agent sync and README-to-website generation
+├── shell/            # zsh and bash, linked into the home folder
+│   ├── env.sh        # DEV_HOME, DOTFILES_HOME, PATH and EDITOR for every shell
+│   ├── aliases.sh    # Aliases and functions shared by zsh and bash
+│   ├── .zshrc        # oh-my-zsh, options, ws completion
+│   ├── .zprofile     # Login shells: PATH after macOS path_helper
+│   ├── .bashrc
+│   ├── .bash_aliases # bash versions of the oh-my-zsh aliases
+│   └── .profile
 ├── tests/            # Isolated lessons and installer suites (npm test)
 ├── tmux/
-│   └── tmux.conf     # Shared tmux config, installed to ~/.tmux.conf
-├── install/          # Installation scripts and GitHub Pages
-│   ├── install.ps1   # Windows installer
-│   ├── install.sh    # Linux/macOS installer
-│   └── index.html    # Landing page
-├── windows/          # Windows-specific configurations
-│   ├── Microsoft.PowerShell_profile.ps1
-│   ├── bin/          # Editor shim: vim.cmd runs Neovim, installed to C:\home\.local\bin
-│   ├── herdr/
-│   │   ├── config.toml # herdr config, installed to %APPDATA%\herdr\config.toml
-│   │   └── plugins/herdr-bar/config.json # herdr-bar settings, installed to its plugin config folder
-│   └── psmux/
-│       └── psmux.conf  # Windows tmux settings, installed to ~/.psmux.conf
-├── linux/            # Linux/macOS/WSL configurations
-│   ├── .bashrc
-│   ├── .bash_aliases
-│   ├── .zshrc
-│   └── .profile
-├── nvim/             # Neovim config (git submodule)
+│   └── tmux.conf     # tmux config, linked to ~/.tmux.conf
 └── .gitignore        # Security patterns
 ```
 
@@ -222,7 +157,7 @@ The generator currently syncs these marker ranges in `README.md`:
 
 - `<!-- sync:quick-start:start --> ... <!-- sync:quick-start:end -->`
 - `<!-- sync:features:start --> ... <!-- sync:features:end -->`
-- `<!-- sync:powershell-reference:start --> ... <!-- sync:powershell-reference:end -->`
+- `<!-- sync:shell-reference:start --> ... <!-- sync:shell-reference:end -->`
 
 ### Git Hook Setup (Recommended)
 
@@ -234,36 +169,30 @@ git config core.hooksPath .githooks
 
 ## Updating
 
-### Update Dotfiles (PowerShell)
-
-Use the built-in profile commands:
-
-```powershell
-dotpull   # Pull from remote and apply (profile, tmux config and shared agent config)
-dotsync   # Apply from local repo without pulling (for testing changes)
-```
-
-Or manually:
+### Update Dotfiles
 
 ```bash
-# In dotfiles directory
-git pull
+dotpull   # Pull from GitHub and apply: links, oh-my-zsh, agent config, git ignore
+dotsync   # Apply the local repo without pulling (for testing changes)
 ```
+
+The shell and tmux files are links into the repository, so a change applies in the next shell, or after Ctrl+Space, `r` in tmux. The Claude and Codex files are copies: run `dotsync` after you change `agents/`, `claude/` or `git/ignore`.
 
 ### Update Neovim Configuration
 
 The Neovim submodule includes Ctrl+F for file search, Ctrl+D for multiple
 selections, Ctrl+Z for undo, and Ctrl+W for closing tabs. Telescope opens file
 results in tabs with Enter. Use F4 for project search, F6 for Git changes,
-F7 for all matching selections, and F8/Shift+F8 to switch tabs when Windows
-Terminal captures Ctrl+Shift or Ctrl+Tab shortcuts. Press Space in normal mode
+F7 for all matching selections, and F8/Shift+F8 to switch tabs when the
+terminal captures Ctrl+Shift or Ctrl+Tab shortcuts. Press Space in normal mode
 to see the shortcut menu. See the [Neovim shortcut guide](https://github.com/romaklimenko/nvim#everyday-shortcuts)
 for the complete mappings and editing steps.
 
-The standard Neovim configuration link points to this submodule, so source
-changes are already local. Restart Neovim after changes and install missing
-plugins with `nvim --headless "+Lazy! install" +qa`. Plugin versions are pinned
-in the submodule's `lazy-lock.json`.
+`~/.config/nvim` links to this submodule, so source changes are already
+local. Restart Neovim after changes and install missing plugins with
+`nvim --headless "+Lazy! install" +qa`. Plugin versions are pinned in the
+submodule's `lazy-lock.json`. File icons need a
+[Nerd Font](https://www.nerdfonts.com) in the terminal.
 
 ```bash
 # Update submodule to latest commit
@@ -286,13 +215,27 @@ Feel free to fork this repository and customize it for your needs:
 
 ### Local Overrides
 
-For machine-specific configurations that shouldn't be committed:
+Machine-specific settings that shouldn't be committed go in files outside the repository:
 
-**Windows:**
-Create `C:\home\dotfiles\windows\profile.local.ps1` (gitignored) and source it from your profile.
+- `~/.zshrc.local` for zsh. `.zshrc` loads it last, so it can override anything
+- `~/.bashrc.local` and `~/.profile.local` for bash
+- `~/.zshenv` for `DEV_HOME`, if your workspaces aren't in `~/Work`
 
-**Linux:**
-Create `~/.bashrc.local` (gitignored) and source it from `.bashrc`.
+### Tokens in the macOS Keychain
+
+Tokens that tools read from environment variables, such as Husker's MCP access tokens, stay out of every file. Store each one in the login Keychain, then export it from `~/.zshrc.local`:
+
+```bash
+husker token --name labs-mac --list Labs | keychain-set HUSKER_ONLINE_TOKEN_LABS
+```
+
+```zsh
+# ~/.zshrc.local
+export HUSKER_ONLINE_URL="https://<app>.azurewebsites.net"
+keychain-env HUSKER_ONLINE_TOKEN HUSKER_ONLINE_TOKEN_LABS
+```
+
+`keychain-set` passes the value to `security` on stdin, so it never shows up in the process list. Each lookup at shell start takes about 15 ms. To remove a token, run `security delete-generic-password -s NAME`, or search for its name in Keychain Access.
 
 ## Security
 
@@ -306,136 +249,64 @@ Create `~/.bashrc.local` (gitignored) and source it from `.bashrc`.
 
 ## Supported Environments
 
-- **Windows:** Windows 10/11 with PowerShell 5.1+
-- **macOS:** macOS with Bash/Zsh (uses linux/ configs)
-- **Linux:** Ubuntu 20.04+ (WSL2 or standalone)
-- **Shell:** Bash 4.0+, Zsh 5.0+
+- **macOS:** Apple silicon or Intel, with zsh (the default shell)
+- **Linux:** Ubuntu 22.04 or newer, with zsh or bash
+- **Shell:** Zsh 5.8+, Bash 4.0+
 
 ## Prerequisites
 
 - Git
-- PowerShell (Windows)
-- Bash/Zsh (Linux)
+- Zsh (default on macOS, `sudo apt install zsh` on Ubuntu). bash works too, without oh-my-zsh
+- Homebrew on macOS, for the Brewfile
 - Node.js 20 or newer (for shared agent sync and lessons tools)
-- Neovim (optional, for nvim config)
-- tmux (optional, for the tmux config). On Windows, psmux provides the `tmux` command
+- Neovim 0.11.3 or newer and ripgrep (optional, for the nvim config)
+- tmux (optional, for the tmux config)
 
 ## Troubleshooting
 
-### Windows: PowerShell Execution Policy
+### macOS: commands come from /usr/bin instead of Homebrew
 
-If you get an execution policy error, run:
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+Every new terminal window and tmux pane on macOS starts a login shell. Its `/etc/zprofile` runs `path_helper`, which moves `/usr/bin` in front of everything else. `~/.zprofile` loads `shell/env.sh` again afterwards, which puts Homebrew, cargo and `~/.local/bin` back in front. If `which git` shows `/usr/bin/git`, check that `~/.zprofile` links to `shell/.zprofile`, then open a new terminal.
 
-### Linux: Permission Denied
+### Permission Denied
 
-Ensure install script is executable:
+Run the installer with bash instead of executing it:
 ```bash
-chmod +x install.sh
+bash install/install.sh --local
 ```
 
-### Windows: Symbolic Links
+### tmux and herdr
 
-Creating symbolic links on Windows requires either:
-- Administrator privileges, or
-- Developer Mode enabled (Settings → Update & Security → For developers)
+Don't start tmux inside a herdr pane if both use the same prefix: herdr catches the key first.
 
-### Windows: herdr panes miss the profile aliases
+## Shell Reference
 
-herdr opens Windows PowerShell 5.1 by default. Its profile lives under `Documents\WindowsPowerShell`, which this setup never installs to, so `gs`, `dots`, `vim` and the other profile shortcuts are missing. The installer copies `windows/herdr/config.toml` to `%APPDATA%\herdr\config.toml`, which sets:
-```toml
-[terminal]
-default_shell = "pwsh"
-```
-If the installer did not run, copy the file yourself and run `herdr server reload-config`. Panes that are already open keep their old shell.
+The zsh configuration includes:
 
-### Windows: herdr prefix key
-
-The herdr prefix is Ctrl+Space, set in `windows/herdr/config.toml`. Windows Terminal 1.1 and later pass it through unchanged, so no remap is needed. Inside herdr panes Ctrl+Space no longer reaches the shell, so PSReadLine's `MenuComplete` on Ctrl+Space is unavailable there. The PowerShell profile binds `MenuComplete` to Tab, so nothing is lost. herdr 0.9.1 stable accepts a single key for `prefix`; the array form shown in the preview docs is rejected with `invalid type: sequence, expected a string`.
-
-Earlier the prefix was F12, reached through a Windows Terminal binding of Ctrl+' (`ctrl+vk(0xBF)`) to a `sendInput` action that emits `\u001b[24~`, because Ctrl plus a punctuation key yields no character on the Danish layout. That binding lives in Windows Terminal's `settings.json`, not in this repository. It is no longer needed and can be removed.
-
-### Windows: review diffs with hunk inside herdr
-
-`windows/herdr/config.toml` binds `prefix+d` to `hunk diff --watch` in a temporary pane. The pane opens in the workspace's working directory, reloads the diff as files change, and closes when hunk exits. herdr runs the command through `cmd.exe`, which finds `hunk.cmd` in the npm global directory, so install hunk with `npm install -g hunkdiff`.
-
-hunk ships a `hunk-review` skill. It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands. The installer links it to `~/.claude/skills/hunk-review` as a junction, so it follows hunk updates without another sync. A typical layout is hunk in one pane and Claude Code in the next: ask Claude to review the diff and its notes appear in the hunk pane.
-
-### Windows: Neovim sidebar inside herdr
-
-The [herdr-nvim](https://github.com/ChmaraX/herdr-nvim) plugin adds a full-height Neovim pane to any herdr tab, plus a file picker and code comments that go to the agent. The Windows installer runs `herdr plugin install ChmaraX/herdr-nvim` when herdr is present and the plugin is missing. herdr binds no keys for plugins, so `windows/herdr/config.toml` binds two `plugin_action` commands:
-
-| Key | Action |
-| --- | --- |
-| `prefix+e` | Toggle the Neovim sidebar. Each tab keeps its own Neovim, and buffers survive the toggle. Closing the tab stops it. |
-| `prefix+o` | Open the file picker. Without a query it lists the files the agent touched this session, newest first. Typing fuzzy-searches the whole repository. Enter opens the file in the sidebar at the right line. |
-
-Both keys replace herdr defaults: `prefix+e` was `edit_scrollback` and `prefix+o` was `open_notification_target`. Free alternatives on herdr 0.9.1 are `prefix+f`, `prefix+i`, `prefix+m`, `prefix+u` and `prefix+a`. Ctrl+click on a `path/file.ext:12` reference in agent output also opens the file in the sidebar.
-
-The sidebar runs this repository's Neovim config, because `%LOCALAPPDATA%\nvim` links to `nvim/`. The plugin injects its own Lua into the sidebar, so these commands work there without a plugin manager entry. The leader key is Space:
-
-| Keys | Command | Action |
-| --- | --- | --- |
-| `Space a c` | `:Herdr comment` | Comment the current line or visual selection |
-| `Space a l` | `:Herdr list` | List comments. Enter edits, `d` deletes |
-| `Space a s` | `:Herdr send` | Paste all comments into the agent's input |
-| `Space a S` | `:Herdr submit` | Send all comments to the agent and submit |
-| `Space a i` | `:Herdr ref` | Insert a `path:12-20` reference at the agent's cursor |
-
-Comments live in memory only and are cleared after a successful send. The prompt includes each comment's file and line, the repository and the branch. The plugin binary is not on `PATH`. To check the setup from inside a herdr session, run `herdr-nvim.exe doctor --with-agent claude` from `%APPDATA%\herdr\plugins\github\chmarax.herdr-nvim-*\bin`.
-
-### Windows: command bar inside herdr
-
-The [herdr-bar](https://github.com/jeffarese/herdr-bar) plugin opens a popup that fuzzy-searches every tab, pane, agent and workspace. `windows/herdr/config.toml` binds it to `prefix+space`: press Ctrl+Space, release, then press Space. Type to filter, move with the arrow keys, press Enter to jump and Esc to close. The plugin's own docs suggest `prefix+k`, but herdr already uses that key for `focus_pane_up`.
-
-herdr-bar is a Rust binary, so it needs no Python. Since 0.10.0 its `herdr-bar.open` action works on Windows too, so the config binds that one instead of the older `herdr-bar.open-windows`.
-
-The installer installs herdr-bar from `jeffarese/herdr-bar` and updates a release older than 0.11.0, which the settings below need. It replaces a herdr-bar installed from another GitHub repository, such as the old romaklimenko/herdr-bar fork, and leaves a locally linked copy alone. herdr runs the plugin's install step in Windows PowerShell 5.1. Started from PowerShell 7, that step inherits PowerShell 7's `PSModulePath` and cannot find `Get-FileHash`, so the checksum check fails and it quietly builds the binary with cargo instead, or fails without Rust. Clearing `PSModulePath` for the install command, as the installer and step 5 do, lets it download the release binary.
-
-`windows/herdr/plugins/herdr-bar/config.json` holds the plugin's settings. The installer copies it to the folder that `herdr plugin config-dir herdr-bar` prints, and backs up a different file it finds there. It sets `"scope": "agent"`, so the bar opens on agents. Backspace on an empty query widens the list to everything, and `ctrl+u` returns to agents. It also sets `"select_current": true`, so the bar opens with the row you are in selected, instead of the row you came from.
-
-The plugin also renames agent tabs to their Claude Code or Codex task title. This is on by default. A tab you rename yourself keeps your name. To turn the renaming off, add `"auto_titles": false` to that `config.json`. By default a tab keeps the title of the session that named it, so after `/clear`, `/resume`, a restarted agent or a new terminal in the pane, it still shows the old task. `config.json` therefore sets `"follow_new_sessions": true` ([#21](https://github.com/jeffarese/herdr-bar/issues/21)), which lets the next session in the same pane take over the tab's title.
-
-### Windows: session names in the herdr sidebar
-
-`windows/herdr/config.toml` shows Claude Code and Codex session names below the workspace and tab. Both agent layouts use `terminal_title_stripped` to display the terminal title without the activity symbol. Copy the config to `%APPDATA%\herdr\config.toml` and run `herdr server reload-config` to apply it to existing panes. See [herdr sidebar configuration](https://herdr.dev/docs/configuration/).
-
-### WSL: File Permissions
-
-If you encounter file permission issues in WSL, ensure your files have correct permissions:
-```bash
-chmod 644 ~/.bashrc ~/.bash_aliases ~/.zshrc ~/.profile
-```
-
-## PowerShell Profile Features
-
-The Windows PowerShell profile includes:
-
-<!-- sync:powershell-reference:start -->
-- **Personal roots:** `$env:DEV_HOME` is `C:\home` and `$env:DOTFILES_HOME` is `C:\home\dotfiles`. `$env:HOME` is deliberately left alone, because setting it on Windows redirects git, ssh and gnupg away from the user profile
-- **Editor:** `$env:EDITOR` is `vim`. In PowerShell `vim` is an alias for Neovim. Tools that spawn the editor directly, such as hunk, resolve `vim` to `windows/bin/vim.cmd`, a shim installed to `C:\home\.local\bin` that runs Neovim. When hunk launches it inside a herdr pane, the shim opens Neovim in a new herdr pane and waits for it, because hunk's suspended terminal never forwards keystrokes on Windows. Git still finds Vim from Git for Windows first
-- **Aliases:**
-  - `ll`, `la` - List files
-  - `vim`, `vi` - Opens Neovim (if installed)
+<!-- sync:shell-reference:start -->
+- **Personal roots:** `DEV_HOME` is `~/Work` and `DOTFILES_HOME` is `~/Work/dotfiles`. `HOME` is left alone, because git, ssh and most other tools read it
+- **Editor:** `EDITOR` and `VISUAL` are `nvim`. `vim` and `vi` open Neovim
+- **oh-my-zsh:** robbyrussell theme with the `git`, `common-aliases`, `extract`, `gh`, `uv`, `rust`, `npm`, `python` and `codex` plugins, plus `macos` and `brew` on macOS or `ubuntu` on Ubuntu. bash gets the same alias names from `shell/.bash_aliases`. `rm`, `cp` and `mv` don't ask before they act, because coding agents run commands with these aliases and can't answer
+- **Git Shortcuts (oh-my-zsh):**
+  - `gst` - git status
+  - `ga`, `gaa` - git add, git add --all
+  - `gc` - git commit --verbose. `gcmsg "message"` commits with a message
+  - `gp` - git push
+  - `gl` - git pull
+  - `gf` - git fetch
+  - `gd`, `gds` - git diff, git diff --staged
+  - `gco`, `gsw`, `gb`, `gba`, `gm` - git checkout, switch, branch, branch --all, merge
+  - `grv` - git remote --verbose
+  - `glog` - git log as a graph, one line per commit. `glol` adds dates and authors
 - **Navigation Shortcuts:**
-  - `cdh`, `hh` - Go to `$env:DEV_HOME`
-  - `dots` - Go to `$env:DOTFILES_HOME`
+  - `cdh`, `hh` - Go to `$DEV_HOME`
+  - `dots` - Go to `$DOTFILES_HOME`
   - `..`, `...`, `....` - Go up 1, 2, or 3 directories
-- **Git Shortcuts:**
-  - `gs` - git status
-  - `ga` - git add
-  - `gc` - git commit
-  - `gpsh` - git push
-  - `gl` - git log (oneline, graph, decorate)
-  - `gd` - git diff
-  - `gco` - git checkout
-  - `gb` - git branch
-  - `gpll` - git pull
+  - `mkcd`, `take` - Create a directory and go into it
+  - `ll`, `la`, `lt` - List files: long, with hidden files, newest first
 - **Databricks Shortcuts:**
-  - `dbcfg` - Open `.databrickscfg` in editor
-  - `d` - databricks
+  - `dbcfg` - Open `~/.databrickscfg` in the editor
+  - `d` - databricks. It replaces oh-my-zsh's `d`, which lists the directory stack
   - `db` - databricks bundle
   - `dbd` - databricks bundle deploy
   - `dbv` - databricks bundle validate
@@ -445,71 +316,43 @@ The Windows PowerShell profile includes:
   - `dj` - databricks jobs
   - `dc` - databricks clusters
   - `dfs` - databricks fs
-- **WSL Integration:**
-  - `ubuntu` - Launch WSL Ubuntu
-  - `wslh` - Open WSL in home directory
 - **tmux:**
-  - `ws` - Open a project folder as a tmux session. `ws webshop` opens `C:\home\webshop`
+  - `ws` - Open a workspace as a tmux session. `ws backstage` opens `~/Work/backstage`, and Tab completes workspace names
 - **Dotfiles Management:**
   - `dotsync` - Apply dotfiles from local repo to system (for testing without committing)
   - `dotpull` - Pull latest from remote repo and apply
+- **Secrets (macOS):**
+  - `keychain-set NAME` - Store one line from stdin in the login Keychain
+  - `keychain-env NAME...` - Export stored values as environment variables, from `~/.zshrc.local`
 - **Utility Functions:**
-  - `pp` - Reload PowerShell profile
-  - `which` - Find command location
-  - `touch` - Create or update file timestamp
-  - `grep` - Search text with patterns
-  - `lsa` - List all files (including hidden)
-  - `du` - Show directory size
-  - `mkcd` - Create directory and cd into it
-  - `myip` - Show external IPv4 address
-  - `myip6` - Show external IPv6 address
-  - `explore` - Open directory in Windows Explorer
-<!-- sync:powershell-reference:end -->
+  - `extract`, `x` - Unpack an archive of any common type
+  - `myip`, `myip6` - Show external IPv4 or IPv6 address
+  - `ofd` - Open the current folder in Finder (macOS)
+  - `omz reload` - Reload zsh after a configuration change
+<!-- sync:shell-reference:end -->
 
 ## tmux
 
-The tmux config is for running several coding agents side by side, on Ubuntu and on Windows. On Windows the `tmux` command is [psmux](https://github.com/psmux/psmux), a native Windows terminal multiplexer that reads tmux config files. Both platforms load the same `tmux/tmux.conf`, so the keys and the layout are the same.
+The tmux config is for running several coding agents side by side, on macOS and Ubuntu. Install tmux with `brew install tmux` on macOS (it is in the Brewfile) or `sudo apt install tmux` on Ubuntu.
 
-Install tmux before you use the config. On Windows:
+### Open one session per workspace
 
-```powershell
-winget install marlocarlo.psmux
-```
-
-On Ubuntu:
+Give each workspace in `~/Work` its own tmux session, and give each agent its own window in that session. Open a workspace with `ws`:
 
 ```bash
-sudo apt install tmux
+ws backstage   # opens ~/Work/backstage as the session "backstage"
+ws             # opens the current folder
 ```
 
-### Open one session per project
+`ws backstage` opens `./backstage` if there is one, and `$DEV_HOME/backstage` otherwise. Tab after `ws` completes the workspace names. Outside tmux, `ws` starts the session and attaches to it. Inside tmux, it switches your view to that session. If the session already exists, `ws` goes back to it.
 
-Give each project its own tmux session, and give each agent its own window in that session. Open a project with `ws`:
-
-```powershell
-ws webshop   # Windows: opens C:\home\webshop as the session "webshop"
-ws           # opens the current folder
-```
-
-On Ubuntu, `ws webshop` opens `./webshop`, or `~/webshop` if there is no `./webshop`. Outside tmux, `ws` starts the session and attaches to it. Inside tmux, it switches your view to that session. If the session already exists, `ws` goes back to it.
-
-In a session, press Ctrl+Space and then `c` to open a new window in the project folder, and start an agent there.
-
-Don't start tmux inside a herdr pane. Both use Ctrl+Space, and herdr catches it first. For the same reason, run Ubuntu's tmux from its own Windows Terminal tab, not from inside a psmux pane.
+In a session, press Ctrl+Space and then `c` to open a new window in the workspace folder, and start an agent there.
 
 ### Switch between agents with Ctrl+Space, w
 
-Press Ctrl+Space, then `w`. A list opens with every session and its windows, one window per agent, named after the agent's session. On Windows it looks like this:
+Press Ctrl+Space, then `w`. A list opens with every session and its windows, one window per agent, named after the agent's session.
 
-```text
-1. dotfiles: 1 windows (attached)
-2.   1: ✳ Tmux configuration and cross-platform setup* (1 panes)
-3.      ✳ Tmux configuration and cross-platform setup
-4. webshop: 1 windows
-5.   1: ✳ Fix the checkout redirect (1 panes)
-```
-
-A line without indent is a session, one per project. `(attached)` means a terminal shows that session now. An indented line with a number, such as `1:`, is a window in that session, and `*` marks the window you are in. The list unfolds the window you are in, so its pane gets a line of its own below it. That is why line 3 repeats the name in line 2: it is the same agent, once as the window and once as its pane.
+Each session is one workspace, and `(attached)` marks the one a terminal shows now. Under it are its windows, numbered `1:`, `2:` and so on, and `*` marks the window you are in. The list unfolds the window you are in, so its pane gets a line of its own that repeats the window's name: it is the same agent, once as the window and once as its pane. Each line starts with a key in brackets, such as `(3)`. Press that key to go there at once.
 
 Use these keys in the list:
 
@@ -517,15 +360,13 @@ Use these keys in the list:
 | --- | --- |
 | Up, Down | Move through the list |
 | Enter | Go to the selected window or pane |
-| A line number, then Enter | Go to that line. On Windows the numbers are at the start of each line. On Ubuntu each line starts with a key in brackets, such as `(3)`, and pressing that key goes there at once |
+| The key in brackets, such as `3` | Go to that line at once |
 | Left, Right | Fold or unfold a session or window |
-| `p` on Windows, `v` on Ubuntu | Show or hide a preview of the selected window |
+| `v` | Show or hide a preview of the selected window |
 | `x` | Close the selected window, after you confirm |
 | Esc or `q` | Close the list |
 
-Ctrl+Space, `s` shows only the sessions, one per project. On Windows, press `f` there and type to filter the sessions by name.
-
-Both lists open without the preview. On Windows, psmux remembers `p` in each terminal: after you show the preview, it opens with every list until you press `p` again or detach.
+Ctrl+Space, `s` shows only the sessions, one per workspace. Both lists open without the preview.
 
 ### Keys
 
@@ -560,21 +401,21 @@ These commands work in any shell:
 | Command | Action |
 | --- | --- |
 | `tmux ls` | List the running sessions |
-| `ws webshop` | Open or go back to a project's session |
-| `tmux kill-session -t webshop` | Close one session and everything running in it |
+| `ws backstage` | Open or go back to a workspace's session |
+| `tmux kill-session -t backstage` | Close one session and everything running in it |
 | `tmux kill-server` | Close every session |
 
-If you come from the herdr config in this repository, the prefix and `h` `j` `k` `l` work the same way. Two keys differ. Ctrl+Space, `d` opened hunk in herdr; tmux detaches. Ctrl+Space, Space opened herdr's command bar; tmux changes the layout of a split window, and Ctrl+Space, `w` is the list to use instead.
+On macOS, Ctrl+Space also switches the input source when you have more than one keyboard layout. If Ctrl+Space changes the layout instead of reaching tmux, turn off "Select the previous input source" in System Settings, Keyboard, Keyboard Shortcuts, Input Sources.
 
 ### Copy text
 
-Copied text goes to the Windows clipboard, so you can paste it anywhere with Ctrl+V. On Ubuntu, tmux hands the text to Windows Terminal, which puts it on the clipboard.
+Copied text goes to the system clipboard, so you can paste it anywhere with Cmd+V. tmux hands the text to the terminal (OSC 52), which also works in a tmux on another machine over ssh. On macOS it also passes the text to `pbcopy`, for terminals that ignore OSC 52, such as Terminal.app.
 
 To copy with the mouse, drag over the text in a shell pane. The text is copied when you release the button.
 
 Some programs take the mouse for themselves, and Claude Code can be one of them. If a drag selects nothing, use one of these instead:
 
-- Hold Shift while you drag. Windows Terminal selects the text itself. Press Ctrl+C, press Enter or right-click to copy it. This selects what is on the screen, so with split panes the selection can run into the next pane.
+- Let the terminal select the text itself: hold Option while you drag in iTerm2 or Terminal.app, or Shift in Ghostty and most Linux terminals. Copy with Cmd+C. This selects what is on the screen, so with split panes the selection can run into the next pane.
 - Press Ctrl+Space, then `[`, and then drag. In copy mode tmux handles the mouse, whatever program runs in the pane.
 
 To copy older output, scroll up with the mouse wheel first. Scrolling puts the pane in copy mode, and you can drag there. If the program in the pane takes the mouse wheel too, press Ctrl+Space, then `[`, and scroll up with PgUp.
@@ -586,42 +427,29 @@ To copy with the keyboard:
 3. Press Space to start the selection, and move to the end of the text.
 4. Press Enter. tmux copies the text and leaves copy mode.
 
-In copy mode, Esc clears a selection you started, and `q` leaves without copying. Copy mode uses vi keys on both platforms, so `/` searches forward and `?` searches back.
+In copy mode, Esc clears a selection you started, and `q` leaves without copying. Copy mode uses vi keys, so `/` searches forward and `?` searches back.
 
 ### How panes get their names
 
-Claude Code sets the terminal title to its session name, with a status symbol in front, such as `✳ Translate recent articles to Danish`. The config shows that title without the symbol. The same name appears in the status bar, in the Windows Terminal tab title after the session name, and on Ubuntu in Ctrl+Space, `w`.
+Claude Code sets the terminal title to its session name, with a status symbol in front, such as `✳ Translate recent articles to Danish`. The config shows that title without the symbol. The same name appears in the status bar, in the terminal's tab title after the session name, and in Ctrl+Space, `w`.
 
 Other panes are named this way:
 
-- A pane at a shell prompt shows its folder name, such as `webshop`.
+- A pane at a shell prompt shows its folder name, such as `backstage`.
 - A program that sets no title shows its command name, such as `nvim`.
 - Codex puts the folder name in the title, so a Codex pane shows the folder, not the task.
 
-### What is different on Windows
-
-psmux works differently from tmux in a few places, and `windows/psmux/psmux.conf` works around them:
-
-- psmux ignores the titles that programs set, unless `allow-set-title` is on. The shared config turns it on.
-- psmux has no `automatic-rename-format`, so window names can't use the pane names above. `~/.psmux.conf` names each window after its raw terminal title instead. Ctrl+Space, `w` shows agent titles with the status symbol, such as `✳ Fix the checkout redirect`, and windows at a prompt show `C:\Program Files\PowerShell\7\pwsh.exe`. The status bar is not affected.
-- psmux updates window names only for the session that is on screen. In Ctrl+Space, `w`, the windows of another project can show an older name until you visit that project.
-- psmux runs one server per session. Ctrl+Space, `r` reloads the config only in the current session. To apply a config change everywhere, run `tmux kill-server` and open your projects again. This closes every session.
-- New panes start PowerShell 7, so the profile and its functions, such as `ws`, are available.
-
 ### Restore sessions after a restart
 
-Sessions don't survive a reboot or `tmux kill-server`. Run `ws` for each project to open them again. To restore sessions automatically, use [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) on Ubuntu or [psmux-resurrect](https://github.com/psmux/psmux-plugins/tree/main/psmux-resurrect) on Windows. This repository doesn't install either one.
+Sessions don't survive a reboot or `tmux kill-server`. Run `ws` for each workspace to open them again. To restore sessions automatically, use [tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect). This repository doesn't install it.
 
 ### Config files
 
 | File in this repository | Installed to | Used by |
 | --- | --- | --- |
-| `tmux/tmux.conf` | `~/.tmux.conf` | tmux and psmux |
-| `windows/psmux/psmux.conf` | `~/.psmux.conf` | psmux |
+| `tmux/tmux.conf` | `~/.tmux.conf` (link) | tmux |
 
-psmux reads `~/.psmux.conf` before `~/.tmux.conf`. That file sets `@psmux`, loads `~/.tmux.conf` and then applies the Windows settings. The shared config puts tmux-only options in `%if "#{!=:#{@psmux},1}"` blocks, because psmux prints a warning for every option it doesn't have.
-
-On Ubuntu the installer links the files, so a change in the repository applies at the next reload. On Windows the installer copies them, so run `dotsync` after you change one.
+The installer links the file, so a change in the repository applies at the next reload.
 
 ## Claude Code and Codex Configuration
 
@@ -636,45 +464,12 @@ other people read, such as guides, wiki pages and READMEs. Those follow the
 "Writing for readers" section: a named reader, an example after every rule,
 the reader's own words, and a list of patterns that mark text as generated.
 
-Both full installers and PowerShell `dotsync` call
-`scripts/sync-agent-config.mjs`. To update only agent configuration, run the
-manual-install command above. The sync merges managed Claude lesson hooks,
-retains unrelated settings/hooks and local commands, and backs up changed
-managed files. Identical repeated syncs do not rewrite files. It does not edit
-Codex `config.toml`, authentication, or `notify`. `--codex-home` can
-select a different Codex home explicitly.
-
-On Windows, sync also repairs the three known Bash-only Databricks plugin hook
-commands in the installed Codex cache. It adds `commandWindows` overrides that
-resolve `PLUGIN_ROOT` inside Python and run the hook with `runpy`. This works
-in PowerShell and cmd, including paths with spaces or shell metacharacters.
-Python must be on PATH. Sync also replaces its previous `%PLUGIN_ROOT%`
-overrides, which failed in PowerShell. The original commands and custom Windows
-overrides are preserved. Changed files receive backups. Run `dotsync` again
-after a plugin update if the new version still needs the repair. Other plugins
-and unfamiliar upstream commands are left alone.
-
-After a repair, open `/hooks` in Codex and review the changed Databricks hooks.
-Codex skips changed hooks until you trust their new definitions. Sync never
-changes hook trust records. [Codex hooks](https://learn.chatgpt.com/docs/hooks)
-
-The Windows PowerShell profile configures PSReadLine only when console output
-is interactive. Redirected agent commands do not enable history predictions.
-
-### Windows Codex daemon workaround
-
-The optional PowerShell `codex-local` function adds `--no-daemon` to avoid the shared daemon
-path while [Codex issue #48074](https://github.com/openai/codex/issues/48074)
-is unresolved. This is a workaround for reported flashing terminal windows,
-not a confirmed upstream fix. Normal `codex` commands keep their default
-behavior. Existing daemon sessions and other clients keep running.
-
-Reload the profile with `pp` or open a new PowerShell window, then start Codex
-with `codex-local`. Resume a saved conversation with `codex-local resume --last`.
-This mode does not support `codex agents`, `codex queue`, or `--remote`.
-Keep the CLI open while work runs. Use normal `codex` when shared-session
-control is needed. The function does not apply to applications that launch
-Codex directly.
+The installer and `dotsync` call `scripts/sync-agent-config.mjs`. To update
+only agent configuration, run the manual-install command above. The sync
+merges managed Claude lesson hooks, retains unrelated settings/hooks and local
+commands, and backs up changed managed files. Identical repeated syncs do not
+rewrite files. It does not edit Codex `config.toml`, authentication, or
+`notify`. `--codex-home` can select a different Codex home explicitly.
 
 Codex loads global AGENTS instructions in fresh sessions. A nonempty
 `AGENTS.override.md` can supersede them. Project discovery normally starts at
@@ -695,12 +490,6 @@ agent-invoked workflow, not background Codex transcript extraction. It works
 without a Claude CLI/model call and without installing Codex hooks or changing
 notifications. Newer Codex clients offer hooks, but this setup also supports
 clients that do not. [Codex hooks](https://learn.chatgpt.com/docs/hooks)
-
-```powershell
-# PowerShell; run from the task's repository.
-node "$env:USERPROFILE/.claude/hooks/lessons.mjs" context
-node "$env:USERPROFILE/.claude/hooks/lessons.mjs" report
-```
 
 ```bash
 # Bash/Zsh; run from the task's repository.
@@ -768,19 +557,17 @@ Existing Claude behavior is retained:
   - Nothing is curated into `AGENTS.md` or `CLAUDE.md`. To share a project's notes with a team, run `git add -f LESSONS.md` once. From then on either agent commits changes to it in a commit of their own, subject to explicit user restrictions. Everything the worker appends to a tracked file gets committed, so track a file only where that is fine
   - A failed model call is retried with a growing backoff (one hour per attempt) and given up after five attempts; the log says which lines were skipped
   - Escape hatches: `CC_LESSONS_DISABLE=1` skips a session (the sweep honours it too), `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_COMPACT_MODEL` (default `sonnet`), `CC_LESSONS_COMPACT_AT_CHARS` (default `10240`), `CC_LESSONS_COMPACT_HOURS` (default `24`), `CC_LESSONS_COMPACT_REJECT_HOURS` (default `168`), `CC_LESSONS_MIN_TURNS` (default `6`, for `Stop`), `CC_LESSONS_MIN_TURNS_FINAL` (default `3`, for `SessionEnd`, `PreCompact` and the sweep), `CC_LESSONS_STOP_MINUTES` (default `30`)
-  - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Without the second a long transcript exceeds the Windows command-line limit and the spawn fails with `ENAMETOOLONG`
+  - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Passing the prompt on stdin keeps a long transcript clear of the command-line length limit
   - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline and portable writer/install tests against isolated fixtures and a fake `claude`
-- **Skills:** The Windows installer links hunk's bundled `hunk-review` skill to `~/.claude/skills/hunk-review` when hunk is installed. See "Windows: review diffs with hunk inside herdr"
-- **herdr plugins:** The Windows installer installs the herdr-nvim plugin when herdr is present. See "Windows: Neovim sidebar inside herdr"
+- **Skills:** The installer links hunk's bundled `hunk-review` skill to `~/.claude/skills/hunk-review` when hunk is installed (`npm install -g hunkdiff`). It lets an agent navigate, comment on and highlight a live hunk session through `hunk session` commands, so a typical layout is hunk in one tmux pane and Claude Code in the next
 - **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
-  - Check which you have with `Get-Item ~/.claude/hooks | Select-Object LinkType`
+  - Check which you have with `ls -l ~/.claude/hooks`
 
 ### Configuration Paths
 
 | Platform | Claude and shared lessons | Codex instructions |
 |----------|---------------------------|--------------------|
-| Windows  | `%USERPROFILE%\.claude\` | `%USERPROFILE%\.codex\AGENTS.md` |
 | macOS    | `~/.claude/` | `~/.codex/AGENTS.md` |
 | Linux    | `~/.claude/` | `~/.codex/AGENTS.md` |
 
@@ -790,18 +577,6 @@ Codex location. Authentication and other Codex configuration remain client-owned
 ### Adding Custom Commands
 
 Create `.md` files in `claude/commands/` to add new slash commands. See the [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code) for the command format.
-
-## Bash/Zsh Features
-
-The Linux shell configuration includes:
-
-- **Aliases:** Similar to PowerShell profile
-- **History:** Enhanced history management (10,000 commands)
-- **Editor:** Neovim set as default (`$EDITOR` and `$VISUAL`)
-- **WSL Detection:** Automatically detects and configures WSL-specific settings
-- **Git Integration:** Useful git aliases and shortcuts
-- **Network Utilities:** `myip`, `myip6`, `localip`, `ports`, `ping`
-- **tmux:** `ws` opens a project folder as a tmux session. `ws webshop` opens `./webshop`, or `~/webshop` if there is no `./webshop`
 
 ## License
 

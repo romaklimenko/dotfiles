@@ -1,6 +1,8 @@
 # ============================================================================
-# .bashrc - Bash configuration
+# .bashrc - bash on Ubuntu, and on macOS when bash is started by hand
 # Author: Roman Klimenko (@romaklimenko)
+#
+# Installed as a link: ~/.bashrc -> $DOTFILES_HOME/shell/.bashrc
 # ============================================================================
 
 # If not running interactively, don't do anything
@@ -8,6 +10,15 @@ case $- in
     *i*) ;;
       *) return;;
 esac
+
+# The folder this file really lives in, through the ~/.bashrc link.
+_dotfiles_shell=$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")
+[ -r "$_dotfiles_shell/env.sh" ] || _dotfiles_shell="${DOTFILES_HOME:-${DEV_HOME:-$HOME/Work}/dotfiles}/shell"
+[ -n "$DOTFILES_HOME" ] || DOTFILES_HOME=$(dirname "$_dotfiles_shell")
+export DOTFILES_HOME
+
+# DEV_HOME, PATH and EDITOR.
+[ -r "$_dotfiles_shell/env.sh" ] && . "$_dotfiles_shell/env.sh"
 
 # -----------------------------------------------------------------------------
 # History Configuration
@@ -38,41 +49,6 @@ shopt -s cdspell 2>/dev/null
 
 # Autocorrect typos in path names when using cd
 shopt -s dirspell 2>/dev/null
-
-# -----------------------------------------------------------------------------
-# Environment Variables
-# -----------------------------------------------------------------------------
-
-# Set default editor to Neovim
-export EDITOR=nvim
-export VISUAL=nvim
-
-# Enable colors for ls
-export CLICOLOR=1
-
-# Less configuration
-export LESS='-R -F -X'
-export LESSHISTFILE=-
-
-# -----------------------------------------------------------------------------
-# WSL-Specific Configuration
-# -----------------------------------------------------------------------------
-
-# Detect if running in WSL
-if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null; then
-    # Set DISPLAY for GUI applications (WSL2)
-    if [ -z "$DISPLAY" ]; then
-        export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
-    fi
-
-    # WSL-specific aliases
-    alias explorer='explorer.exe'
-    alias cmd='cmd.exe'
-    alias powershell='powershell.exe'
-
-    # Navigate to Windows home
-    alias winhome='cd /mnt/c/Users/$USER'
-fi
 
 # -----------------------------------------------------------------------------
 # Prompt Configuration
@@ -110,6 +86,8 @@ if ! shopt -oq posix; then
     . /usr/share/bash-completion/bash_completion
   elif [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
+  elif [ -n "$HOMEBREW_PREFIX" ] && [ -f "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh" ]; then
+    . "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh"
   fi
 fi
 
@@ -117,18 +95,26 @@ fi
 # Aliases
 # -----------------------------------------------------------------------------
 
-# Source bash aliases from separate file
-if [ -f ~/dotfiles/linux/.bash_aliases ]; then
-    . ~/dotfiles/linux/.bash_aliases
-elif [ -f ~/.bash_aliases ]; then
-    . ~/.bash_aliases
-fi
+# Shared with zsh: workspaces, ws, dotsync, Databricks.
+[ -r "$_dotfiles_shell/aliases.sh" ] && . "$_dotfiles_shell/aliases.sh"
+
+# The oh-my-zsh names for git, ls and the rest, so bash matches zsh.
+[ -r "$_dotfiles_shell/.bash_aliases" ] && . "$_dotfiles_shell/.bash_aliases"
+
+# ws completes the workspaces in $DEV_HOME, and the folders here.
+_ws() {
+    local IFS=$'\n'
+    COMPREPLY=($(cd "$DEV_HOME" 2>/dev/null && compgen -d -- "${COMP_WORDS[COMP_CWORD]}"))
+}
+complete -o dirnames -F _ws ws
+
+unset _dotfiles_shell
 
 # -----------------------------------------------------------------------------
 # Local Overrides
 # -----------------------------------------------------------------------------
 
-# Source local bashrc if it exists (gitignored)
+# Machine-specific settings and secrets, kept out of this public repository.
 if [ -f ~/.bashrc.local ]; then
     . ~/.bashrc.local
 fi

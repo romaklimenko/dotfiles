@@ -115,7 +115,7 @@ test("same-source directory symlinks remain intact and are never rewritten", (t)
   const f = fixture(t);
   mkdirSync(join(f.home, ".claude"), { recursive: true });
   for (const name of ["hooks", "commands"]) {
-    symlinkSync(join(f.repo, "claude", name), join(f.home, ".claude", name), process.platform === "win32" ? "junction" : "dir");
+    symlinkSync(join(f.repo, "claude", name), join(f.home, ".claude", name), "dir");
   }
   const sourceHook = join(f.repo, "claude", "hooks", "lessons-context.mjs");
   const before = readFileSync(sourceHook);
@@ -131,7 +131,7 @@ test("unexpected directory links fail before changing any installed file", (t) =
   const other = join(f.home, "other hooks");
   put(join(other, "lessons-context.mjs"), "// do not change\n");
   mkdirSync(join(f.home, ".claude"), { recursive: true });
-  symlinkSync(other, join(f.home, ".claude", "hooks"), process.platform === "win32" ? "junction" : "dir");
+  symlinkSync(other, join(f.home, ".claude", "hooks"), "dir");
   assert.throws(f.run, /Refusing to write through directory link/);
   assert.equal(existsSync(join(f.home, ".claude", "AGENTS.md")), false);
   assert.equal(readFileSync(join(other, "lessons-context.mjs"), "utf8"), "// do not change\n");
@@ -170,105 +170,10 @@ function databricksHooks(f, version = "0.2.22") {
   return file;
 }
 
-test("Windows sync repairs all Databricks hooks, backs up originals and preserves trust settings", (t) => {
+test("sync leaves Codex plugin hooks unchanged", (t) => {
   const f = fixture(t);
-  f.options.platform = "win32";
   const file = databricksHooks(f);
   const before = readFileSync(file);
-  const config = join(f.codexHome, "config.toml");
-  const configText = 'notify = ["local-notify"]\n[hooks.state.example]\ntrusted_hash = "keep"\n';
-  put(config, configText);
-  const result = f.run();
-  const hooks = JSON.parse(readFileSync(file, "utf8")).hooks;
-  for (const [event, script] of Object.entries({ SessionStart: "databricks-context.py", UserPromptSubmit: "databricks-router.py", PostToolUse: "databricks-auth-helper.py" })) {
-    assert.ok(hooks[event][0].hooks[0].commandWindows.includes(`'hooks', '${script}'`));
-    assert.match(hooks[event][0].hooks[0].commandWindows, /os\.environ\['PLUGIN_ROOT'\]/);
-  }
-  assert.equal(hooks.SessionStart[0].hooks[0].command, JSON.parse(before).hooks.SessionStart[0].hooks[0].command);
-  assert.deepEqual(result.repairedHooks, [file]);
-  assert.deepEqual(readFileSync(result.backups[0]), before);
-  assert.equal(readFileSync(config, "utf8"), configText);
-  assert.doesNotMatch(readFileSync(file, "utf8"), /(?<!\r)\n/);
-  assert.deepEqual(f.run().changed, []);
-  const nextVersion = databricksHooks(f, "0.2.23");
-  assert.deepEqual(f.run().repairedHooks, [nextVersion]);
-});
-
-test("Windows sync keeps custom overrides and unfamiliar upstream hook commands", (t) => {
-  const f = fixture(t);
-  f.options.platform = "win32";
-  const file = databricksHooks(f);
-  const value = JSON.parse(readFileSync(file, "utf8"));
-  value.hooks.SessionStart[0].hooks[0].commandWindows = "custom-windows-hook";
-  value.hooks.UserPromptSubmit[0].hooks[0].command_windows = "custom-alias-hook";
-  value.hooks.PostToolUse[0].hooks[0].command += " --upstream-change";
-  put(file, value);
-  const before = readFileSync(file);
-  assert.deepEqual(f.run().repairedHooks, []);
-  assert.deepEqual(readFileSync(file), before);
-});
-
-test("Windows sync migrates its previous cmd-only hook overrides", (t) => {
-  const f = fixture(t);
-  f.options.platform = "win32";
   f.run();
-  const file = databricksHooks(f);
-  const value = JSON.parse(readFileSync(file, "utf8"));
-  for (const groups of Object.values(value.hooks)) {
-    const hook = groups[0].hooks[0];
-    const script = hook.command.match(/hooks\/(databricks-[a-z-]+\.py)/)[1];
-    hook.commandWindows = `python "%PLUGIN_ROOT%/hooks/${script}"`;
-  }
-  put(file, value);
-  const before = readFileSync(file);
-  const result = f.run();
-  assert.deepEqual(result.repairedHooks, [file]);
-  assert.deepEqual(readFileSync(result.backups[0]), before);
-  assert.doesNotMatch(readFileSync(file, "utf8"), /%PLUGIN_ROOT%/);
-  assert.deepEqual(f.run().changed, []);
-});
-
-test("Windows hook launchers pass stdin and resolve paths in PowerShell and cmd", { skip: process.platform !== "win32" }, (t) => {
-  const f = fixture(t);
-  const file = databricksHooks(f, "test $plugin & path");
-  f.run();
-  const pluginRoot = dirname(dirname(file));
-  const hooks = JSON.parse(readFileSync(file, "utf8")).hooks;
-  const payload = { prompt: "Preserve input", session_id: "test-session" };
-  const shells = [
-    { executable: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command"] },
-    { executable: "pwsh.exe", args: ["-NoProfile", "-NonInteractive", "-Command"] },
-    { executable: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c"], windowsVerbatimArguments: true },
-  ];
-  for (const [event, groups] of Object.entries(hooks)) {
-    const hook = groups[0].hooks[0];
-    const script = hook.command.match(/hooks\/(databricks-[a-z-]+\.py)/)[1];
-    put(join(pluginRoot, "hooks", script), [
-      "import json, pathlib, sys",
-      "assert __name__ == '__main__'",
-      "print(json.dumps({'script': pathlib.Path(__file__).name, 'input': json.load(sys.stdin)}))",
-      "",
-    ].join("\n"));
-    for (const shell of shells) {
-      const output = execFileSync(shell.executable, [...shell.args, hook.commandWindows], {
-        cwd: f.repo,
-        env: { ...process.env, PLUGIN_ROOT: pluginRoot },
-        input: JSON.stringify(payload),
-        encoding: "utf8",
-        timeout: 15000,
-        windowsHide: true,
-        windowsVerbatimArguments: shell.windowsVerbatimArguments,
-      });
-      assert.deepEqual(JSON.parse(output), { script, input: payload }, `${event} via ${shell.executable}`);
-    }
-  }
-});
-
-test("non-Windows sync leaves plugin hooks unchanged", (t) => {
-  const f = fixture(t);
-  f.options.platform = "linux";
-  const file = databricksHooks(f);
-  const before = readFileSync(file);
-  assert.deepEqual(f.run().repairedHooks, []);
   assert.deepEqual(readFileSync(file), before);
 });

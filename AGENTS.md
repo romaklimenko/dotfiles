@@ -6,8 +6,10 @@ This repository contains the [dotfiles](https://github.com/topics/dotfiles) conf
 
 This setup supports the following environments:
 
-- Windows
-- Ubuntu (WSL or standalone)
+- macOS (zsh with oh-my-zsh)
+- Ubuntu (zsh with oh-my-zsh, or bash)
+
+Windows is no longer supported. Don't add PowerShell, psmux or WSL configuration.
 
 ## Development Guidelines
 
