@@ -24,8 +24,6 @@ Dotfiles for macOS and Ubuntu by Roman Klimenko ([@romaklimenko](https://github.
 - **Claude Code and Codex Configuration:** One maintained instruction source for both agents
   - Shared `AGENTS.md`, with a one-line Claude include
   - Settings sync preserves unrelated local settings, hooks and Codex notifications
-  - Shared project, workspace and user lessons: Claude extracts them through hooks; Codex reads and records them through the portable lessons command
-  - Custom Claude slash commands, including `/lessons` for locations and pipeline health
 
 - **Automated Installation:** One-line setup for new machines via [dotfiles.klimenko.dk](https://dotfiles.klimenko.dk)
   - A Brewfile with the command-line tools for the Mac
@@ -107,11 +105,9 @@ dotfiles/
 ├── Brewfile          # Command-line tools for the Mac (brew bundle)
 ├── agents/
 │   └── AGENTS.md     # Global instructions installed for Claude and Codex
-├── claude/           # Claude settings and shared lessons tools
+├── claude/           # Claude settings
 │   ├── CLAUDE.md     # One-line @AGENTS.md include
-│   ├── settings.json # Global settings
-│   ├── commands/     # Custom slash commands
-│   └── hooks/        # Shared reader/writer plus Claude extraction and compaction
+│   └── settings.json # Global settings
 ├── git/
 │   └── ignore        # Global git ignore, installed to ~/.config/git/ignore
 ├── install/          # Installation script and GitHub Pages
@@ -127,7 +123,7 @@ dotfiles/
 │   ├── .bashrc
 │   ├── .bash_aliases # bash versions of the oh-my-zsh aliases
 │   └── .profile
-├── tests/            # Isolated lessons and installer suites (npm test)
+├── tests/            # Agent config sync tests (npm test)
 ├── tmux/
 │   └── tmux.conf     # tmux config, linked to ~/.tmux.conf
 └── .gitignore        # Security patterns
@@ -252,7 +248,7 @@ keychain-env HUSKER_ONLINE_TOKEN HUSKER_ONLINE_TOKEN_LABS
 - Git
 - Zsh (default on macOS, `sudo apt install zsh` on Ubuntu). bash works too, without oh-my-zsh
 - Homebrew on macOS, for the Brewfile
-- Node.js 20 or newer (for shared agent sync and lessons tools)
+- Node.js 20 or newer (for the agent config sync)
 - Neovim 0.11.3 or newer and ripgrep (optional, for the nvim config)
 - tmux (optional, for the tmux config)
 
@@ -443,8 +439,8 @@ The installer links the file, so a change in the repository applies at the next 
 
 ## Claude Code and Codex Configuration
 
-`agents/AGENTS.md` is the shared source for writing style, code, git, security,
-workspace guidance and lessons. Installation copies it to `~/.claude/AGENTS.md`
+`agents/AGENTS.md` is the shared source for writing style, code, git, security
+and workspace guidance. Installation copies it to `~/.claude/AGENTS.md`
 and `$CODEX_HOME/AGENTS.md` (default `~/.codex/AGENTS.md`). Claude's global
 `CLAUDE.md` contains only `@AGENTS.md`. Repository instructions use the same
 layout but remain separate from global preferences.
@@ -456,7 +452,7 @@ the reader's own words, and a list of patterns that mark text as generated.
 
 The installer and `dotsync` call `scripts/sync-agent-config.mjs`. To update
 only agent configuration, run the manual-install command above. The sync
-merges managed Claude lesson hooks, retains unrelated settings/hooks and local
+merges managed Claude settings, retains unrelated settings, hooks and local
 commands, and backs up changed managed files. Identical repeated syncs do not
 rewrite files. It does not edit Codex `config.toml`, authentication, or
 `notify`. `--codex-home` can select a different Codex home explicitly.
@@ -467,96 +463,18 @@ the Git root, so the shared instructions also load applicable outer workspace
 guidance when working in an independent nested clone.
 [Codex instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 
-### Portable lessons for both agents
+### What the sync installs
 
-The store stays under `~/.claude/lessons/`, with user lessons in
-`~/.claude/LESSONS.md`; both agents use the same files. The legacy
-`<!-- claude-code lessons, auto-written -->` marker remains valid. No migration
-or duplicate Codex store is needed.
-
-The shared instructions tell Codex to run the context command at task start and
-record observable, durable lessons before finishing each task. This is an
-agent-invoked workflow, not background Codex transcript extraction. It works
-without a Claude CLI/model call and without installing Codex hooks or changing
-notifications. Newer Codex clients offer hooks, but this setup also supports
-clients that do not. [Codex hooks](https://learn.chatgpt.com/docs/hooks)
-
-```bash
-# Bash/Zsh; run from the task's repository.
-node "$HOME/.claude/hooks/lessons.mjs" context
-node "$HOME/.claude/hooks/lessons.mjs" report
-```
-
-Both commands accept `--cwd <absolute-directory>`. Context includes the
-project/workspace/global lessons, applicable out-of-tree files, and paths to
-outer workspace guidance. Unmanaged or symlinked lesson files are listed rather
-than injected.
-
-`lessons.mjs record` accepts JSON on stdin:
-
-```json
-{
-  "cwd": "<absolute task repository directory>",
-  "agent": "codex",
-  "lessons": [{
-    "scope": "project",
-    "lesson": "An observed environment fact that will still matter next time.",
-    "evidence": "Exact short error or correction observed in the session.",
-    "tags": ["tooling"]
-  }]
-}
-```
-
-Use `agent: claude` for immediate Claude recording. An optional `session`
-identifies the session in the evidence log. No real transcript or model is read
-by this command. The agent must select supported observations; a nonempty
-`evidence` field alone cannot prove that the observation happened.
-
-The writer allows at most three lessons (500 characters each; evidence up to
-1000), requires evidence, rejects credential-like content, narrows scope,
-deduplicates against applicable managed lessons, and uses the extraction and
-compaction lock. It returns JSON with `recorded`, `skipped`, or `error`; errors
-exit nonzero. A held lock returns `skipped` and must be retried after the other
-writer finishes. No lesson/state writes occur for `CC_LESSONS_DISABLE`, worker
-children, or temporary-directory tasks. This remains a supported file-reading
-fallback if an agent has no hook facility; it cannot force a running client to
-reload instructions.
-
-Keep `LESSONS.md` ignored unless deliberately shared. The shared instructions
-retain the existing separate-commit rule for already tracked lesson files,
-subject to explicit user restrictions. Runtime state and evidence stay outside
-this public repository. Do not record task summaries or duplicate facts already
-in project instructions.
-
-### Claude's background extraction
-
-Existing Claude behavior is retained:
-
-- **Settings:** Managed hooks merge into `~/.claude/settings.json`; existing local values are retained and missing defaults added
-  - Permission rules include restrictions on reading `.env` files
-- **Custom Commands:** Managed slash commands synced to `~/.claude/commands/`
-  - `/lessons` - Shows which `LESSONS.md` files apply to the current directory and whether the pipeline is healthy. `/lessons compact <path>` merges one file now through the worker. `/lessons tidy <path>` merges one file while you watch
-- **Hooks:** Session notes and shared tools synced to `~/.claude/hooks/`
-  - Lessons live at three levels and each one is filed at the lowest level where it is still true. **Project** is the git repository. **Workspace** is the nearest directory above the repository that groups several repositories: it qualifies when it holds an `AGENTS.md`, a `CLAUDE.md`, a `.git`, a `*.code-workspace` file, or a `LESSONS.md` the hook wrote earlier. The home directory, anything above it and temp directories never qualify. **User** is `~/.claude/LESSONS.md`. A repository with no marked directory above it has no workspace, and its workspace-level lessons stay in the project
-  - `SessionStart` runs `lessons-context.mjs`. It injects every `LESSONS.md` that applies to the working directory: the directory itself, each parent up to the root (which covers the project and the workspace), the out-of-tree copies under `~/.claude/lessons/projects/`, then `~/.claude/LESSONS.md`. A file over 12288 characters is shown as its header plus the newest bullets that fit, chosen by date, with a note saying how many older ones were left out. Files without the marker, or reached through a symlink, are listed by path but not injected. `SessionStart` also wakes the worker so it can sweep
-  - `Stop` (at most once per 30 minutes per session), `PreCompact` and `SessionEnd` run `enqueue-lesson.mjs`. It queues a job and detaches `extract-lessons.mjs`
-  - The worker reads the part of the transcript it has not seen, asks a cheap model for at most three lessons per chunk, each tagged `project`, `workspace` or `global`, and appends them as `- [date] lesson` bullets. The model sees the project and workspace paths and the bullets already on file for them. Whatever the model asked for, a lesson is then moved down: to the project when it names the project directory or a term in `~/.claude/lessons/private-terms.txt`, and to the workspace when it names the workspace directory, a hostname, or an absolute path outside the home directory. A path under the home directory describes this machine and stays global. The evidence for each bullet goes to `~/.claude/lessons/log.jsonl`
-  - The worker also sweeps `~/.claude/projects/` for transcripts that went quiet without a `SessionEnd`, so a killed window still gets its retrospective
-  - After each run the worker compacts the oversized files that apply to the directories it saw, not only the ones it appended to, so a project that goes quiet is still cleaned up. Over 10240 characters, at most once a day per file, a stronger model (`CC_LESSONS_COMPACT_MODEL`, default `sonnet`) merges bullets that say the same thing and drops the ones a later bullet made stale. The rewrite is refused when it adds bullets, keeps fewer than 40% of them, comes out longer than the file, loses more than 10% of the flags, identifiers, error constants and versions it was given, or earns nothing: it has to merge away at least 5% of the bullets or shrink the file by 10%. A refused file waits a week instead of a day. The bullets it replaced go to `~/.claude/lessons/compact.jsonl`. A file with hand-written lines between the bullets is never rewritten. `node ~/.claude/hooks/extract-lessons.mjs --compact <path>` compacts one file on demand, whatever its size, and exits non-zero if the model call fails
-  - A project file is written in-tree only when git is proven to ignore it or the project already tracks it. Otherwise it goes to `~/.claude/lessons/projects/<slug>/LESSONS.md`, which is also where a project outside any repository keeps its notes. A workspace file follows the same proof inside a repository. A workspace outside any repository gets the file in place, because a directory only counts as a workspace when it was deliberately set up as one. A `LESSONS.md` without the `<!-- claude-code lessons, auto-written -->` marker is never touched
-  - Nothing is curated into `AGENTS.md` or `CLAUDE.md`. To share a project's notes with a team, run `git add -f LESSONS.md` once. From then on either agent commits changes to it in a commit of their own, subject to explicit user restrictions. Everything the worker appends to a tracked file gets committed, so track a file only where that is fine
-  - A failed model call is retried with a growing backoff (one hour per attempt) and given up after five attempts; the log says which lines were skipped
-  - Escape hatches: `CC_LESSONS_DISABLE=1` skips a session (the sweep honours it too), `CC_LESSONS_MODEL` (default `haiku`), `CC_LESSONS_COMPACT_MODEL` (default `sonnet`), `CC_LESSONS_COMPACT_AT_CHARS` (default `10240`), `CC_LESSONS_COMPACT_HOURS` (default `24`), `CC_LESSONS_COMPACT_REJECT_HOURS` (default `168`), `CC_LESSONS_MIN_TURNS` (default `6`, for `Stop`), `CC_LESSONS_MIN_TURNS_FINAL` (default `3`, for `SessionEnd`, `PreCompact` and the sweep), `CC_LESSONS_STOP_MINUTES` (default `30`)
-  - The worker calls `claude -p` with `--tools ""`, `--setting-sources ""`, `--no-session-persistence` and hooks disabled. It clears `CLAUDECODE` from the child environment and passes the prompt on stdin. Without the first the CLI refuses to start as a nested session. Passing the prompt on stdin keeps a long transcript clear of the command-line length limit
-  - Runtime state lives in `~/.claude/lessons/` (queue, cursors, `lessons.log`), outside this repository. `npm test` runs the pipeline and portable writer/install tests against isolated fixtures and a fake `claude`
-- **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `LESSONS.md` and `.claude/settings.local.json` in every repository. Tracked files are unaffected. The worker also pins `LESSONS.md` in each repository's `.git/info/exclude`
+- **Settings:** the defaults in `claude/settings.json` merge into `~/.claude/settings.json`. Local values win, and missing defaults are added. The permission rules stop Claude from reading `.env` files. Hooks that still run the retired lessons scripts are removed
+- **Custom commands and hooks:** files in `claude/commands/` and `claude/hooks/` are copied to `~/.claude/commands/` and `~/.claude/hooks/`. The repository ships none at the moment. Local commands and hooks with other names are left alone
+- **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `.claude/settings.local.json` in every repository, and `LESSONS.md`, the notes a retired Claude Code hook used to write. Tracked files are unaffected
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
   - Check which you have with `ls -l ~/.claude/hooks`
 
 ### Configuration Paths
 
-| Platform | Claude and shared lessons | Codex instructions |
-|----------|---------------------------|--------------------|
+| Platform | Claude | Codex instructions |
+|----------|--------|--------------------|
 | macOS    | `~/.claude/` | `~/.codex/AGENTS.md` |
 | Linux    | `~/.claude/` | `~/.codex/AGENTS.md` |
 

@@ -64,11 +64,9 @@ tmp/
 local/
 private/
 
-# Session notes written by the Claude Code lessons hook. This repository is
-# public, so they stay out of it. Runtime state lives in ~/.claude/lessons.
+# Notes a retired Claude Code hook wrote. This repository is public, so the
+# old file stays out of it.
 LESSONS.md
-claude/lessons/
-**/log.jsonl
 
 # Shell history (if accidentally placed in repo)
 .bash_history

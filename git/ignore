@@ -1,9 +1,9 @@
 # Global git ignore, installed from dotfiles (git/ignore) to
 # ~/.config/git/ignore. Git reads that path when core.excludesFile is unset.
-# Tracked files are unaffected: `git add -f LESSONS.md` opts a project in.
+# Tracked files are unaffected.
 
 # Claude Code per-machine settings
 **/.claude/settings.local.json
 
-# Session notes written by the Claude Code lessons hook
+# Notes a retired Claude Code hook wrote; old copies stay untracked
 LESSONS.md

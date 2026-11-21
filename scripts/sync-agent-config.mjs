@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
+// Hook scripts dotfiles used to install. Sync removes hooks that still run them.
+const RETIRED_HOOK_SCRIPTS = ["lessons-context.mjs", "enqueue-lesson.mjs"];
+
 function jsonFile(file) {
   let value;
   try { value = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")); }
@@ -43,10 +46,10 @@ export function mergeSettings(local, defaults) {
   if (!isObject(defaultHooks) || (local.hooks !== undefined && !isObject(local.hooks))) {
     throw new Error("Claude settings hooks must be an object");
   }
-  const ownedScripts = new Set(Object.values(defaultHooks).flatMap((groups) => {
+  const ownedScripts = new Set([...RETIRED_HOOK_SCRIPTS, ...Object.values(defaultHooks).flatMap((groups) => {
     if (!Array.isArray(groups)) throw new Error("Claude hook events must contain arrays");
     return groups.flatMap((group) => (group.hooks ?? []).map(hookScript).filter(Boolean));
-  }));
+  })]);
   const result = withDefaults(local, otherDefaults);
   result.hooks = {};
   for (const [event, groups] of Object.entries(local.hooks ?? {})) {
@@ -59,6 +62,9 @@ export function mergeSettings(local, defaults) {
   }
   for (const [event, groups] of Object.entries(defaultHooks)) {
     result.hooks[event] = [...(result.hooks[event] ?? []), ...groups];
+  }
+  for (const [event, groups] of Object.entries(result.hooks)) {
+    if (!groups.length) delete result.hooks[event];
   }
   return result;
 }
@@ -92,6 +98,7 @@ function validateParents(file, root) {
 
 function sourceFiles(directory) {
   const result = [];
+  if (!existsSync(directory)) return result;
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const file = join(directory, entry.name);
     if (entry.isDirectory()) result.push(...sourceFiles(file));

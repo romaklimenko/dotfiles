@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { syncAgentConfig } from "../scripts/sync-agent-config.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/sync-agent-config.mjs", import.meta.url));
-const OWNED = 'node "$HOME/.claude/hooks/lessons-context.mjs"';
+const OWNED = 'node "$HOME/.claude/hooks/example-hook.mjs"';
 const CUSTOM = { type: "command", command: "echo local-hook" };
 const DEFAULTS = {
   respectGitignore: true,
@@ -37,8 +37,8 @@ function fixture(t) {
   put(join(repo, "agents", "AGENTS.md"), "# Shared instructions\n");
   put(join(repo, "claude", "CLAUDE.md"), "@AGENTS.md\n");
   put(join(repo, "claude", "settings.json"), DEFAULTS);
-  put(join(repo, "claude", "hooks", "lessons-context.mjs"), "// current hook\n");
-  put(join(repo, "claude", "commands", "lessons.md"), "Read lessons.\n");
+  put(join(repo, "claude", "hooks", "example-hook.mjs"), "// current hook\n");
+  put(join(repo, "claude", "commands", "example.md"), "Example command.\n");
   const options = { repo, home, codexHome };
   return { repo, home, codexHome, options, run: () => syncAgentConfig(options) };
 }
@@ -52,8 +52,8 @@ test("fresh install copies shared instructions and owned files; second run chang
     assert.equal(readFileSync(file, "utf8"), "# Shared instructions\n");
   }
   assert.equal(readFileSync(join(f.home, ".claude", "CLAUDE.md"), "utf8"), "@AGENTS.md\n");
-  assert.equal(readFileSync(join(f.home, ".claude", "hooks", "lessons-context.mjs"), "utf8"), "// current hook\n");
-  assert.equal(readFileSync(join(f.home, ".claude", "commands", "lessons.md"), "utf8"), "Read lessons.\n");
+  assert.equal(readFileSync(join(f.home, ".claude", "hooks", "example-hook.mjs"), "utf8"), "// current hook\n");
+  assert.equal(readFileSync(join(f.home, ".claude", "commands", "example.md"), "utf8"), "Example command.\n");
   assert.equal(lstatSync(join(f.home, ".claude", "hooks")).isSymbolicLink(), false);
   assert.deepEqual(f.run().changed, []);
   assert.deepEqual(f.run().backups, []);
@@ -87,17 +87,17 @@ test("local settings and mixed custom hooks survive replacement of the owned hoo
   assert.deepEqual(f.run().changed, []);
 });
 
-test("managed changes are backed up; unrelated commands, hooks, lessons and Codex notify stay byte-identical", (t) => {
+test("managed changes are backed up; unrelated commands, hooks, notes and Codex notify stay byte-identical", (t) => {
   const f = fixture(t);
   const oldInstruction = join(f.codexHome, "AGENTS.md");
   put(oldInstruction, "Existing custom instruction.\n");
-  const hook = join(f.home, ".claude", "hooks", "lessons-context.mjs");
+  const hook = join(f.home, ".claude", "hooks", "example-hook.mjs");
   put(hook, "// old deployed hook\n");
   const untouched = new Map([
     [join(f.codexHome, "config.toml"), 'notify = ["computer-use", "notify"]\ncustom = true\n'],
     [join(f.home, ".claude", "hooks", "my-hook.mjs"), "// local hook\n"],
     [join(f.home, ".claude", "commands", "my-command.md"), "Local command.\n"],
-    [join(f.home, ".claude", "LESSONS.md"), "Remember this.\n"],
+    [join(f.home, ".claude", "NOTES.md"), "Remember this.\n"],
   ]);
   for (const [file, content] of untouched) put(file, content);
   const result = f.run();
@@ -117,24 +117,24 @@ test("same-source directory symlinks remain intact and are never rewritten", (t)
   for (const name of ["hooks", "commands"]) {
     symlinkSync(join(f.repo, "claude", name), join(f.home, ".claude", name), "dir");
   }
-  const sourceHook = join(f.repo, "claude", "hooks", "lessons-context.mjs");
+  const sourceHook = join(f.repo, "claude", "hooks", "example-hook.mjs");
   const before = readFileSync(sourceHook);
   f.run();
   assert.ok(lstatSync(join(f.home, ".claude", "hooks")).isSymbolicLink());
   assert.deepEqual(readFileSync(sourceHook), before);
-  assert.deepEqual(readdirSync(dirname(sourceHook)), ["lessons-context.mjs"]);
+  assert.deepEqual(readdirSync(dirname(sourceHook)), ["example-hook.mjs"]);
   assert.deepEqual(f.run().changed, []);
 });
 
 test("unexpected directory links fail before changing any installed file", (t) => {
   const f = fixture(t);
   const other = join(f.home, "other hooks");
-  put(join(other, "lessons-context.mjs"), "// do not change\n");
+  put(join(other, "example-hook.mjs"), "// do not change\n");
   mkdirSync(join(f.home, ".claude"), { recursive: true });
   symlinkSync(other, join(f.home, ".claude", "hooks"), "dir");
   assert.throws(f.run, /Refusing to write through directory link/);
   assert.equal(existsSync(join(f.home, ".claude", "AGENTS.md")), false);
-  assert.equal(readFileSync(join(other, "lessons-context.mjs"), "utf8"), "// do not change\n");
+  assert.equal(readFileSync(join(other, "example-hook.mjs"), "utf8"), "// do not change\n");
 });
 
 test("invalid installed settings fail before instruction or hook writes", (t) => {
@@ -176,4 +176,28 @@ test("sync leaves Codex plugin hooks unchanged", (t) => {
   const before = readFileSync(file);
   f.run();
   assert.deepEqual(readFileSync(file), before);
+});
+
+test("a repository without hooks or commands folders still syncs", (t) => {
+  const f = fixture(t);
+  rmSync(join(f.repo, "claude", "hooks"), { recursive: true });
+  rmSync(join(f.repo, "claude", "commands"), { recursive: true });
+  assert.equal(f.run().changed.length, 4);
+  assert.deepEqual(f.run().changed, []);
+});
+
+test("hooks that run retired lessons scripts are removed from local settings", (t) => {
+  const f = fixture(t);
+  const file = join(f.home, ".claude", "settings.json");
+  const retired = (name) => ({ type: "command", command: `node "$HOME/.claude/hooks/${name}"`, timeout: 10 });
+  put(file, {
+    hooks: {
+      SessionStart: [{ matcher: "startup", hooks: [retired("lessons-context.mjs"), retired("enqueue-lesson.mjs"), CUSTOM] }],
+      Stop: [{ hooks: [retired("enqueue-lesson.mjs")] }],
+    },
+  });
+  f.run();
+  const installed = JSON.parse(readFileSync(file, "utf8"));
+  assert.deepEqual(installed.hooks.SessionStart[0], { matcher: "startup", hooks: [CUSTOM] });
+  assert.equal(installed.hooks.Stop, undefined);
 });

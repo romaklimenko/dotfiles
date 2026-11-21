@@ -190,8 +190,7 @@ echo ""
 
 print_info "[6/8] Installing the global git ignore..."
 # Git reads ~/.config/git/ignore when core.excludesFile is unset. It keeps
-# LESSONS.md, written by the Claude Code lessons hook, out of every
-# repository unless a project opts in.
+# local-only files such as .claude/settings.local.json out of every repository.
 GIT_IGNORE_SOURCE="$DOTFILES_DIR/git/ignore"
 GIT_IGNORE_TARGET="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
 GIT_EXCLUDES_FILE="$(git config --global --get core.excludesFile 2>/dev/null || true)"
@@ -234,8 +233,6 @@ done
 [ ! -f "$CLAUDE_CONFIG_DIR/settings.json" ] && ISSUES+=("Claude Code settings not found at $CLAUDE_CONFIG_DIR/settings.json")
 [ ! -f "$CLAUDE_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Claude instructions not found at $CLAUDE_CONFIG_DIR/AGENTS.md")
 [ ! -f "$CODEX_CONFIG_DIR/AGENTS.md" ] && ISSUES+=("Shared Codex instructions not found at $CODEX_CONFIG_DIR/AGENTS.md")
-[ ! -d "$CLAUDE_CONFIG_DIR/commands" ] && ISSUES+=("Claude Code commands not found at $CLAUDE_CONFIG_DIR/commands")
-[ ! -d "$CLAUDE_CONFIG_DIR/hooks" ] && ISSUES+=("Claude Code hooks not found at $CLAUDE_CONFIG_DIR/hooks")
 [ -z "$GIT_EXCLUDES_FILE" ] && [ ! -f "$GIT_IGNORE_TARGET" ] && ISSUES+=("Global git ignore not found at $GIT_IGNORE_TARGET")
 
 if [ ${#ISSUES[@]} -eq 0 ]; then
