@@ -9,6 +9,7 @@ Dotfiles for macOS and Ubuntu by Roman Klimenko ([@romaklimenko](https://github.
   - `DEV_HOME` (`~/Work`, one folder per workspace) and `DOTFILES_HOME` instead of overriding `HOME`
   - The standard oh-my-zsh aliases for git, ls and archives, plus Databricks shortcuts
   - Homebrew, cargo and `~/.local/bin` first on `PATH`, in login shells too
+  - The `tailscale` command from the Tailscale Mac app, when the app is installed
   - Tokens kept in the macOS Keychain and exported at shell start, never written to a file
 
 - **tmux Configuration:** Made for running several coding agents side by side:

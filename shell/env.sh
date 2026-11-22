@@ -61,6 +61,18 @@ unset _dotfiles_brew
 _dotfiles_path_first "$HOME/.cargo/bin"
 _dotfiles_path_first "$HOME/bin"
 _dotfiles_path_first "$HOME/.local/bin"
+
+# Tailscale's Mac app ships its CLI inside the app bundle as "Tailscale".
+# macOS file names ignore case, so `tailscale` finds it once the folder is on
+# PATH. It goes last, so a Homebrew tailscale would still win.
+_dotfiles_tailscale=/Applications/Tailscale.app/Contents/MacOS
+if [ -d "$_dotfiles_tailscale" ]; then
+    case ":$PATH:" in
+        *":$_dotfiles_tailscale:"*) ;;
+        *) PATH="$PATH:$_dotfiles_tailscale" ;;
+    esac
+fi
+unset _dotfiles_tailscale
 export PATH
 unset -f _dotfiles_path_first
 
