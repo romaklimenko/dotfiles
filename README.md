@@ -125,7 +125,8 @@ dotfiles/
 │   └── .profile
 ├── tests/            # Agent config sync tests (npm test)
 ├── tmux/
-│   └── tmux.conf     # tmux config, linked to ~/.tmux.conf
+│   ├── tmux.conf     # tmux config, linked to ~/.tmux.conf
+│   └── ws.sh         # Opens a workspace session, for ws and :ws
 └── .gitignore        # Security patterns
 ```
 
@@ -332,6 +333,8 @@ ws             # opens the current folder
 
 `ws backstage` opens `./backstage` if there is one, and `$DEV_HOME/backstage` otherwise. Tab after `ws` completes the workspace names. Outside tmux, `ws` starts the session and attaches to it. Inside tmux, it switches your view to that session. If the session already exists, `ws` goes back to it.
 
+When an agent is running in the pane, there's no shell prompt to type `ws` at. Use the tmux command prompt instead. Press Ctrl+Space, then `:`, and type `ws backstage`. It works the same as the shell command, and `ws` on its own opens the pane's folder. The pane you left keeps running in its own session. If the folder doesn't exist, tmux shows the error in the pane. Press `q` to close it.
+
 In a session, press Ctrl+Space and then `c` to open a new window in the workspace folder, and start an agent there.
 
 ### Switch between agents with Ctrl+Space, w
@@ -379,7 +382,7 @@ The prefix is Ctrl+Space. Press it, release it, and then press the key in the ta
 | Ctrl+Space, `$` | Rename the session |
 | Ctrl+Space, `d` | Detach. The session keeps running, and `ws` brings it back |
 | Ctrl+Space, `r` | Reload the config |
-| Ctrl+Space, `:` | Type a tmux command, such as `kill-session` |
+| Ctrl+Space, `:` | Type a tmux command, such as `ws backstage` or `kill-session` |
 | Ctrl+Space, Ctrl+Space | Send Ctrl+Space to the program in the pane |
 
 These commands work in any shell:
