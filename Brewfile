@@ -13,6 +13,8 @@ brew "tmux"
 brew "neovim"
 brew "ripgrep"
 brew "fd"
+brew "hunk"
+brew "midnight-commander"
 
 # Languages and package managers
 brew "node"

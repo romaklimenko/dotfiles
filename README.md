@@ -57,6 +57,8 @@ cd ~/Work/dotfiles
 ```bash
 brew bundle --file Brewfile
 ```
+If you install something with `brew install` later, add it to the Brewfile too. `brew bundle cleanup --file Brewfile` lists what's installed but missing from the Brewfile. Without `--force` it only prints the list.
+
 On Ubuntu:
 ```bash
 sudo apt update && sudo apt install zsh tmux neovim ripgrep fd-find git nodejs
