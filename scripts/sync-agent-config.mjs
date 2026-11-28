@@ -38,7 +38,7 @@ function withDefaults(local, defaults) {
 
 function hookScript(hook) {
   if (hook?.type !== "command" || typeof hook.command !== "string") return null;
-  return hook.command.match(/(?:\.claude[\\/]hooks[\\/])([^\s"']+\.mjs)(?=[\s"']|$)/)?.[1] ?? null;
+  return hook.command.match(/(?:\.claude[\\/]hooks[\\/])([^\s"']+\.(?:mjs|sh))(?=[\s"']|$)/)?.[1] ?? null;
 }
 
 export function mergeSettings(local, defaults) {

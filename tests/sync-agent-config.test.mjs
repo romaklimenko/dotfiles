@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { syncAgentConfig } from "../scripts/sync-agent-config.mjs";
+import { mergeSettings, syncAgentConfig } from "../scripts/sync-agent-config.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/sync-agent-config.mjs", import.meta.url));
 const OWNED = 'node "$HOME/.claude/hooks/example-hook.mjs"';
@@ -85,6 +85,15 @@ test("local settings and mixed custom hooks survive replacement of the owned hoo
   assert.equal(result.backups.length, 1);
   assert.deepEqual(readFileSync(result.backups[0]), before);
   assert.deepEqual(f.run().changed, []);
+});
+
+test("owned shell hooks are replaced, not duplicated, on every sync", () => {
+  const shellHook = (state) => ({ type: "command", command: `sh "$HOME/.claude/hooks/state.sh" ${state}`, timeout: 5 });
+  const defaults = { hooks: { Stop: [{ hooks: [shellHook("done")] }] } };
+  const local = { hooks: { Stop: [{ hooks: [shellHook("old-argument"), CUSTOM] }] } };
+  const once = mergeSettings(local, defaults);
+  assert.deepEqual(once.hooks.Stop, [{ hooks: [CUSTOM] }, { hooks: [shellHook("done")] }]);
+  assert.deepEqual(mergeSettings(once, defaults), once);
 });
 
 test("managed changes are backed up; unrelated commands, hooks, notes and Codex notify stay byte-identical", (t) => {

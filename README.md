@@ -16,6 +16,7 @@ Dotfiles for macOS and Ubuntu by Roman Klimenko ([@romaklimenko](https://github.
   - Ctrl+Space prefix, one session per workspace opened with `ws`, one window per agent
   - tmux windows and panes named after the agent's session, or after the folder at a shell prompt
   - Ctrl+Space, `w` lists every workspace and agent, so you can switch between them
+  - ✅ on a window whose agent has finished, and ❓ on one that waits for your answer
   - Copied text goes to the system clipboard
 
 - **Neovim Configuration:** VS Code-style editing shortcuts, multicursors, Telescope file tabs, and Git previews with Danish-keyboard alternatives (from [romaklimenko/nvim](https://github.com/romaklimenko/nvim))
@@ -110,6 +111,8 @@ dotfiles/
 │   └── AGENTS.md     # Global instructions installed for Claude and Codex
 ├── claude/           # Claude settings
 │   ├── CLAUDE.md     # One-line @AGENTS.md include
+│   ├── hooks/
+│   │   └── tmux-agent-state.sh # Marks a tmux window as done or waiting
 │   └── settings.json # Global settings
 ├── git/
 │   └── ignore        # Global git ignore, installed to ~/.config/git/ignore
@@ -360,6 +363,25 @@ Use these keys in the list:
 
 Ctrl+Space, `s` shows only the sessions, one per workspace. Both lists open without the preview.
 
+### See which agents are done or waiting
+
+A window name in the status bar gets a symbol in front of it when its agent needs you:
+
+| Symbol | What happened | It goes away when |
+| --- | --- | --- |
+| ✅ | The agent finished, and you haven't opened the window since | You open the window |
+| ❓ | The agent waits for your answer to a permission prompt, a question, or an MCP server's request for input | You answer, or send the next prompt |
+
+The right side of the status bar lists every workspace that has such a window, with its symbols, such as `husker ✅ labs ❓`. That's how you see agents in the other sessions. An agent that finishes in the window you're looking at gets no ✅. If you're in another app at that moment, you won't get one either, because tmux counts the window as seen.
+
+Claude Code hooks in `claude/settings.json` run `~/.claude/hooks/tmux-agent-state.sh`. The script sets the tmux window option `@agent` to `done` or `waiting`, and `tmux.conf` turns that into the symbol. `dotsync` installs the script and the hooks.
+
+Codex has no event for "waiting for your answer", so a Codex window only gets ✅. The sync doesn't edit Codex settings. Add this line to `~/.codex/config.toml` yourself, above the first `[section]`:
+
+```toml
+notify = ["sh", "-c", "sh \"$HOME/.claude/hooks/tmux-agent-state.sh\" done"]
+```
+
 ### Keys
 
 The prefix is Ctrl+Space. Press it, release it, and then press the key in the table. Ctrl+Space, `?` lists every key.
@@ -440,8 +462,9 @@ Sessions don't survive a reboot or `tmux kill-server`. Run `ws` for each workspa
 | File in this repository | Installed to | Used by |
 | --- | --- | --- |
 | `tmux/tmux.conf` | `~/.tmux.conf` (link) | tmux |
+| `claude/hooks/tmux-agent-state.sh` | `~/.claude/hooks/tmux-agent-state.sh` (copy) | Claude Code and Codex hooks |
 
-The installer links the file, so a change in the repository applies at the next reload.
+The installer links `tmux.conf`, so a change in the repository applies at the next reload. The hook script is a copy, so run `dotsync` after you change it.
 
 ## Claude Code and Codex Configuration
 
@@ -471,8 +494,9 @@ guidance when working in an independent nested clone.
 
 ### What the sync installs
 
-- **Settings:** the defaults in `claude/settings.json` merge into `~/.claude/settings.json`. Local values win, and missing defaults are added. The permission rules stop Claude from reading `.env` files. Hooks that still run the retired lessons scripts are removed
-- **Custom commands and hooks:** files in `claude/commands/` and `claude/hooks/` are copied to `~/.claude/commands/` and `~/.claude/hooks/`. The repository ships none at the moment. Local commands and hooks with other names are left alone
+- **Settings:** the defaults in `claude/settings.json` merge into `~/.claude/settings.json`. Local values win, and missing defaults are added. The permission rules stop Claude from reading `.env` files. The hooks mark tmux windows as done or waiting (see [See which agents are done or waiting](#see-which-agents-are-done-or-waiting)). Hooks that still run the retired lessons scripts are removed
+- **Custom commands and hooks:** files in `claude/commands/` and `claude/hooks/` are copied to `~/.claude/commands/` and `~/.claude/hooks/`. The repository ships one hook script, `tmux-agent-state.sh`. Local commands and hooks with other names are left alone
+- **Hooks are never added twice:** a hook in `~/.claude/settings.json` that runs a `.mjs` or `.sh` file from `~/.claude/hooks/` with the same name as a repository hook belongs to the repository. Each sync removes it and adds the current version from `claude/settings.json`
 - **Global git ignore:** the patterns in `git/ignore` are installed into `~/.config/git/ignore`, which git reads when `core.excludesFile` is unset. An existing file is kept and only missing patterns are appended. It ignores `.claude/settings.local.json` in every repository, and `LESSONS.md`, the notes a retired Claude Code hook used to write. Tracked files are unaffected
 - **Existing links:** Sync keeps commands/hooks directory links that already point to this repo. Other destinations use per-file copies; copied files need another sync after source changes. Links to unrelated directories are refused before writing
   - Check which you have with `ls -l ~/.claude/hooks`
